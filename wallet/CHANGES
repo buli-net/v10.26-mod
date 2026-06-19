@@ -1,3 +1,38 @@
+v10.26 mod by buli
+
+* - 19/6/2026
++ Fix theme ui setting bug light/dark
+- wallet/AndroidManifest.xml [ add line 181, comment line 182->184]
+- wallet/res/values-night/styles.xml [ add code line 56->85]
+- wallet/res/values/styles.xml [ add code line 130->159]
+- wallet/res/values/colors.xml [ add code line 20 ]
+- wallet/res/values-night/colors.xml [ add code line 11 ]
+
++ Add button [i] show transaction
+- Create file wallet/res/drawable/ic_info_white_24dp.xml
+- Add code file wallet/res/menu/wallet_transactions_context.xml [ add code line 11->15 ]
+- Add code file wallet/src/de/schildbach/wallet/ui/WalletTransactionsFragment.java [ add code line 261->355,390->392, 422->426]
+
++ Add bar sync block start app
+- wallet/src/net/buli/w/ui/WalletActivity.java 
+[ Add code line 76->84, add line 151->307 ]
+
++ add on/off check for new version in settings menu.
+
+- wallet/res/xml/preference_settings.xml [add code line 49->55 ]
+- wallet/src/de/schildbach/wallet/ui/AlertDialogsViewModel.java [ add code line 117, 199->212. // code 258-> 270]
+- wallet/src/de/schildbach/wallet/Configuration.java [ add code line 60, 291->295 ]
+- wallet/res/values/strings.xml [ add code line 60->63 ]
+
++ Update fee sent coin[ v11.04 ]
+- wallet/assets-prod/fees.txt 
+
++ Update checkpoints v11.04
+- wallet/assets-prod/checkpoints.txt
+
+
+
+
 v10.25-v10.26
 
 * Add mBTC and µBTC denominations with more decimal places.
