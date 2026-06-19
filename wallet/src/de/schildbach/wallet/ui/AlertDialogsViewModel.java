@@ -114,146 +114,160 @@ public class AlertDialogsViewModel extends AndroidViewModel {
 
     @WorkerThread
     private void processAsync(final HttpUrl versionUrl) {
-        if (config.isEnableVersionCheck()) {
-            try {
-                log.debug("querying \"{}\"...", versionUrl);
-                final Request.Builder request = new Request.Builder();
-                request.url(versionUrl);
-                final Headers.Builder headers = new Headers.Builder();
-                headers.add("Accept-Charset", "utf-8");
-                final String userAgent = application.httpUserAgent();
-                if (userAgent != null)
-                    headers.add("User-Agent", userAgent);
-                request.headers(headers.build());
+        if (config.isEnableVersionCheck()) {//add check version on/off
+        try {
+            log.debug("querying \"{}\"...", versionUrl);
+            final Request.Builder request = new Request.Builder();
+            request.url(versionUrl);
+            final Headers.Builder headers = new Headers.Builder();
+            headers.add("Accept-Charset", "utf-8");
+            final String userAgent = application.httpUserAgent();
+            if (userAgent != null)
+                headers.add("User-Agent", userAgent);
+            request.headers(headers.build());
 
-                final OkHttpClient.Builder httpClientBuilder = Constants.HTTP_CLIENT.newBuilder();
-                httpClientBuilder.connectionSpecs(Collections.singletonList(ConnectionSpec.RESTRICTED_TLS));
-                final Call call = httpClientBuilder.build().newCall(request.build());
+            final OkHttpClient.Builder httpClientBuilder = Constants.HTTP_CLIENT.newBuilder();
+            httpClientBuilder.connectionSpecs(Collections.singletonList(ConnectionSpec.RESTRICTED_TLS));
+            final Call call = httpClientBuilder.build().newCall(request.build());
 
-                final Response response = call.execute();
-                if (response.isSuccessful()) {
-                    // Maybe show timeskew alert.
-                    final Date serverDate = response.headers().getDate("Date");
-                    if (serverDate != null) {
-                        final long diffMinutes = Math.abs(
-                                (System.currentTimeMillis() - serverDate.getTime()) / DateUtils.MINUTE_IN_MILLIS);
-                        if (diffMinutes >= 60) {
-                            log.info("according to \"" + versionUrl + "\", system clock is off by " + diffMinutes
-                                    + " minutes");
-                            showTimeskewAlertDialog.postValue(new Event<>(diffMinutes));
-                            return;
-                        }
-                    }
-
-                    // Read properties from server.
-                    final Map<String, String> properties = new HashMap<>();
-                    try (final BufferedReader reader = new BufferedReader(response.body().charStream())) {
-                        while (true) {
-                            final String line = reader.readLine();
-                            if (line == null)
-                                break;
-                            if (line.charAt(0) == '#')
-                                continue;
-
-                            final Splitter splitter = Splitter.on('=').trimResults();
-                            final Iterator<String> split = splitter.split(line).iterator();
-                            if (!split.hasNext())
-                                continue;
-                            final String key = split.next();
-                            if (!split.hasNext()) {
-                                properties.put(null, key);
-                                continue;
-                            }
-                            final String value = split.next();
-                            if (!split.hasNext()) {
-                                properties.put(key.toLowerCase(Locale.US), value);
-                                continue;
-                            }
-                            log.info("Ignoring line: {}", line);
-                        }
-                    }
-
-                    // Maybe show version alert.
-                    String recommendedVersionKey = "version";
-                    Integer recommendedVersion = properties.containsKey(recommendedVersionKey) ?
-                            Ints.tryParse(properties.get(recommendedVersionKey)) : null;
-                    Installer recommendedMarket = Installer.F_DROID;
-                    if (installer != null) {
-                        final String versionKey = "version." + installer.name().toLowerCase(Locale.US);
-                        final Integer version = properties.containsKey(versionKey) ?
-                                Ints.tryParse(properties.get(versionKey)) : null;
-                        if (recommendedVersion == null || (version != null && version > recommendedVersion)) {
-                            recommendedVersionKey = versionKey;
-                            recommendedVersion = version;
-                            recommendedMarket = installer;
-                        }
-                    }
-                    if (recommendedVersion != null) {
-                        log.info("according to \"{}\" strongly recommended minimum app {} is \"{}\", recommended " +
-                                "market is {}", versionUrl, recommendedVersionKey, recommendedVersion, recommendedMarket);
-                        if (recommendedVersion > application.packageInfo().versionCode) {
-                            showVersionAlertDialog.postValue(new Event<>(recommendedMarket));
-                            return;
-                        }
+            final Response response = call.execute();
+            if (response.isSuccessful()) {
+                // Maybe show timeskew alert.
+                final Date serverDate = response.headers().getDate("Date");
+                if (serverDate != null) {
+                    final long diffMinutes = Math.abs(
+                            (System.currentTimeMillis() - serverDate.getTime()) / DateUtils.MINUTE_IN_MILLIS);
+                    if (diffMinutes >= 60) {
+                        log.info("according to \"" + versionUrl + "\", system clock is off by " + diffMinutes
+                                + " minutes");
+                        showTimeskewAlertDialog.postValue(new Event<>(diffMinutes));
+                        return;
                     }
                 }
-            } catch (final Exception x) {
-                if (x instanceof UnknownHostException || x instanceof SocketException || x instanceof SocketTimeoutException) {
-                    // swallow
-                    log.debug("problem reading", x);
-                } else {
-                    CrashReporter.saveBackgroundTrace(new RuntimeException(versionUrl.toString(), x),
-                            application.packageInfo());
-                    log.warn("problem parsing", x);
+
+                // Read properties from server.
+                final Map<String, String> properties = new HashMap<>();
+                try (final BufferedReader reader = new BufferedReader(response.body().charStream())) {
+                    while (true) {
+                        final String line = reader.readLine();
+                        if (line == null)
+                            break;
+                        if (line.charAt(0) == '#')
+                            continue;
+
+                        final Splitter splitter = Splitter.on('=').trimResults();
+                        final Iterator<String> split = splitter.split(line).iterator();
+                        if (!split.hasNext())
+                            continue;
+                        final String key = split.next();
+                        if (!split.hasNext()) {
+                            properties.put(null, key);
+                            continue;
+                        }
+                        final String value = split.next();
+                        if (!split.hasNext()) {
+                            properties.put(key.toLowerCase(Locale.US), value);
+                            continue;
+                        }
+                        log.info("Ignoring line: {}", line);
+                    }
                 }
+
+                // Maybe show version alert.
+                String recommendedVersionKey = "version";
+                Integer recommendedVersion = properties.containsKey(recommendedVersionKey) ?
+                        Ints.tryParse(properties.get(recommendedVersionKey)) : null;
+                Installer recommendedMarket = Installer.F_DROID;
+                if (installer != null) {
+                    final String versionKey = "version." + installer.name().toLowerCase(Locale.US);
+                    final Integer version = properties.containsKey(versionKey) ?
+                            Ints.tryParse(properties.get(versionKey)) : null;
+                    if (recommendedVersion == null || (version != null && version > recommendedVersion)) {
+                        recommendedVersionKey = versionKey;
+                        recommendedVersion = version;
+                        recommendedMarket = installer;
+                    }
+                }
+                if (recommendedVersion != null) {
+                    log.info("according to \"{}\" strongly recommended minimum app {} is \"{}\", recommended " +
+                            "market is {}", versionUrl, recommendedVersionKey, recommendedVersion, recommendedMarket);
+                    if (recommendedVersion > application.packageInfo().versionCode) {
+                        showVersionAlertDialog.postValue(new Event<>(recommendedMarket));
+                        return;
+                    }
+                }
+                //add check version on/off
+            } 
+        } catch (final Exception x) {
+            if (x instanceof UnknownHostException || x instanceof SocketException || x instanceof SocketTimeoutException) {
+                // swallow
+                log.debug("problem reading", x);
+            } else {
+                CrashReporter.saveBackgroundTrace(new RuntimeException(versionUrl.toString(), x),
+                        application.packageInfo());
+                log.warn("problem parsing", x);
             }
         }
+    }
+    //end 
+                // Maybe show insecure device alert.
+                if (Build.VERSION.SECURITY_PATCH.compareToIgnoreCase(Constants.SECURITY_PATCH_INSECURE_BELOW) < 0) {
+                    showInsecureDeviceAlertDialog.postValue(new Event<>(Constants.SECURITY_PATCH_INSECURE_BELOW));
+                    return;
+                }
 
-        // Maybe show insecure device alert.
-        if (Build.VERSION.SECURITY_PATCH.compareToIgnoreCase(Constants.SECURITY_PATCH_INSECURE_BELOW) < 0) {
-            showInsecureDeviceAlertDialog.postValue(new Event<>(Constants.SECURITY_PATCH_INSECURE_BELOW));
-            return;
-        }
+                // Maybe show low storage alert.
+                final Intent stickyIntent = application.registerReceiver(null,
+                        new IntentFilter(Intent.ACTION_DEVICE_STORAGE_LOW));
+                if (stickyIntent != null) {
+                    showLowStorageAlertDialog.postValue(Event.simple());
+                    return;
+                }
 
-        // Maybe show low storage alert.
-        final Intent stickyIntent = application.registerReceiver(null,
-                new IntentFilter(Intent.ACTION_DEVICE_STORAGE_LOW));
-        if (stickyIntent != null) {
-            showLowStorageAlertDialog.postValue(Event.simple());
-            return;
-        }
+                // Maybe show too much balance alert.
+                if (Constants.NETWORK_PARAMETERS.getId().equals(MainNetParams.ID_MAINNET)) {
+                    final Coin balance = application.getWallet().getBalance();
+                    if (balance.isGreaterThan(Constants.TOO_MUCH_BALANCE_THRESHOLD)) {
+                        showTooMuchBalanceAlertDialog.postValue(Event.simple());
+                        return;
+                    }
+                }
 
-        // Maybe show too much balance alert.
-        if (Constants.NETWORK_PARAMETERS.getId().equals(MainNetParams.ID_MAINNET)) {
-            final Coin balance = application.getWallet().getBalance();
-            if (balance.isGreaterThan(Constants.TOO_MUCH_BALANCE_THRESHOLD)) {
-                showTooMuchBalanceAlertDialog.postValue(Event.simple());
-                return;
+                final boolean walletIsEmpty = application.getWallet().getTransactions(true).isEmpty();
+
+                // Maybe show battery optimization dialog.
+                if (config.isTimeForBatteryOptimizationDialog() &&
+                        ContextCompat.checkSelfPermission(application,
+                                Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS) == PackageManager.PERMISSION_GRANTED &&
+                        !powerManager.isIgnoringBatteryOptimizations(application.getPackageName()) &&
+                        !walletIsEmpty) {
+                    showBatteryOptimizationDialog.postValue(Event.simple());
+                    return;
+                }
+
+                // Maybe request notification permission.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        ContextCompat.checkSelfPermission(application,
+                                Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
+                        !walletIsEmpty) {
+                    requestNotificationPermissionDialog.postValue(Event.simple());
+                    return;
+                }
+
+                log.info("all good, no alert dialog shown");
+        /* //delete code add check version on/off
+            }
+        } catch (final Exception x) {
+            if (x instanceof UnknownHostException || x instanceof SocketException || x instanceof SocketTimeoutException) {
+                // swallow
+                log.debug("problem reading", x);
+            } else {
+                CrashReporter.saveBackgroundTrace(new RuntimeException(versionUrl.toString(), x),
+                        application.packageInfo());
+                log.warn("problem parsing", x);
             }
         }
-
-        final boolean walletIsEmpty = application.getWallet().getTransactions(true).isEmpty();
-
-        // Maybe show battery optimization dialog.
-        if (config.isTimeForBatteryOptimizationDialog() &&
-                ContextCompat.checkSelfPermission(application,
-                        Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS) == PackageManager.PERMISSION_GRANTED &&
-                !powerManager.isIgnoringBatteryOptimizations(application.getPackageName()) &&
-                !walletIsEmpty) {
-            showBatteryOptimizationDialog.postValue(Event.simple());
-            return;
-        }
-
-        // Maybe request notification permission.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(application,
-                        Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
-                !walletIsEmpty) {
-            requestNotificationPermissionDialog.postValue(Event.simple());
-            return;
-        }
-
-        log.info("all good, no alert dialog shown");
+*/ //end delete
     }
 
     @MainThread
