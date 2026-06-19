@@ -114,6 +114,7 @@ public class AlertDialogsViewModel extends AndroidViewModel {
 
     @WorkerThread
     private void processAsync(final HttpUrl versionUrl) {
+        if (config.isEnableVersionCheck()) {//add check version on/off
         try {
             log.debug("querying \"{}\"...", versionUrl);
             final Request.Builder request = new Request.Builder();
@@ -195,7 +196,20 @@ public class AlertDialogsViewModel extends AndroidViewModel {
                         return;
                     }
                 }
-
+                //add check version on/off
+            } 
+        } catch (final Exception x) {
+            if (x instanceof UnknownHostException || x instanceof SocketException || x instanceof SocketTimeoutException) {
+                // swallow
+                log.debug("problem reading", x);
+            } else {
+                CrashReporter.saveBackgroundTrace(new RuntimeException(versionUrl.toString(), x),
+                        application.packageInfo());
+                log.warn("problem parsing", x);
+            }
+        }
+    }
+    //end 
                 // Maybe show insecure device alert.
                 if (Build.VERSION.SECURITY_PATCH.compareToIgnoreCase(Constants.SECURITY_PATCH_INSECURE_BELOW) < 0) {
                     showInsecureDeviceAlertDialog.postValue(new Event<>(Constants.SECURITY_PATCH_INSECURE_BELOW));
@@ -241,6 +255,7 @@ public class AlertDialogsViewModel extends AndroidViewModel {
                 }
 
                 log.info("all good, no alert dialog shown");
+        /* //delete code add check version on/off
             }
         } catch (final Exception x) {
             if (x instanceof UnknownHostException || x instanceof SocketException || x instanceof SocketTimeoutException) {
@@ -252,6 +267,7 @@ public class AlertDialogsViewModel extends AndroidViewModel {
                 log.warn("problem parsing", x);
             }
         }
+*/ //end delete
     }
 
     @MainThread
