@@ -57,6 +57,7 @@ public class Configuration {
     public static final String PREFS_KEY_DATA_USAGE = "data_usage";
     public static final String PREFS_KEY_BATTERY_OPTIMIZATION = "battery_optimization";
     public static final String PREFS_KEY_NOTIFICATIONS = "notifications";
+    public static final String PREFS_KEY_ENABLE_VERSION_CHECK = "enable_version_check"; // add check version on/off
     public static final String PREFS_KEY_REMIND_BALANCE_TIME = "remind_balance_time";
     public static final String PREFS_KEY_DISCLAIMER = "disclaimer";
     public static final String PREFS_KEY_BLUETOOTH_ADDRESS = "bluetooth_address";
