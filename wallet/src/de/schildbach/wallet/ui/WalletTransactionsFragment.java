@@ -258,6 +258,102 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
         viewModel.selectedTransaction.setValue(transactionId);
     }
 
+        //add show transaction
+
+public void showTransactionDetails(final Sha256Hash transactionId) {
+    viewModel.selectedTransaction.setValue(transactionId);
+    final Wallet wallet = viewModel.wallet.getValue();
+    final Transaction tx = wallet.getTransaction(transactionId);
+    if (tx == null) return;
+
+    boolean txSent = false;
+    try { txSent = wallet != null && tx.getValue(wallet).signum() < 0; } catch(Exception e) {}
+
+    int confs = 0; try { confs = tx.getConfidence().getDepthInBlocks(); } catch(Exception e){}
+    int height = 0; try { height = tx.getConfidence().getAppearedAtChainHeight(); } catch(Exception e){}
+    org.bitcoinj.core.Coin fee = null; try { fee = tx.getFee(); } catch(Exception e){}
+    boolean rbf = false; try { rbf = tx.isOptInFullRBF(); } catch(Exception e){}
+
+    java.util.Date updateTime = null; try { updateTime = tx.getUpdateTime(); } catch(Exception e){}
+    String timeStr = updateTime != null ? new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(updateTime) : "n/a";
+
+    boolean isSegWit = false;
+    try {
+        for (org.bitcoinj.core.TransactionInput in : tx.getInputs()) {
+            org.bitcoinj.core.TransactionOutput conn = in.getConnectedOutput();
+            if (conn != null) {
+                org.bitcoinj.core.Address a = conn.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
+                if (a != null && a.toString().startsWith("bc1")) { isSegWit = true; break; }
+            }
+        }
+    } catch(Exception e){}
+
+    String status = confs <= 0 ? "PENDING" : confs < 6 ? "BUILDING" : "CONFIRMED";
+    String statusColor = status.equals("PENDING") ? "#FFA726" : status.equals("BUILDING") ? "#29B6F6" : "#66BB6A";
+
+    StringBuilder html = new StringBuilder();
+    html.append("<big><b>").append(txSent ? "Sent" : "Received").append("</b></big><br>");
+    html.append(tx.getTxId().toString()).append("<br><br>");
+    html.append("<b>Time:</b> ").append(timeStr).append("<br>");
+    html.append("<b>Confirmations:</b> ").append(confs).append("<br>");
+    html.append("<b>Block:</b> ").append(height>0?height:"unconfirmed").append("<br><br>");
+    html.append("<b>Fee:</b> ").append(fee!=null?fee.toFriendlyString():"0 BTC").append("<br>");
+    try { int vsize=(tx.getWeight()+3)/4; if(fee!=null) html.append("<b>Fee rate:</b> ").append(String.format(java.util.Locale.US,"%.1f", (double)fee.value/vsize)).append(" sat/vB<br>"); } catch(Exception e){}
+    html.append("<b>Size:</b> ").append(tx.getMessageSize()).append(" bytes | <b>Weight:</b> ").append(tx.getWeight()).append("<br>");
+    html.append("<b>RBF:</b> ").append(rbf?"Yes":"No").append(" | <b>SegWit:</b> ").append(isSegWit?"Yes":"No").append("<br><br>");
+    html.append("<b>Status:</b> <font color='").append(statusColor).append("'>").append(status).append("</font><br><br>");
+
+    org.bitcoinj.core.Coin totalFrom = org.bitcoinj.core.Coin.ZERO;
+    java.util.List<String> fromLines = new java.util.ArrayList<>();
+    for (org.bitcoinj.core.TransactionInput in : tx.getInputs()) {
+        try { org.bitcoinj.core.TransactionOutput c = in.getConnectedOutput(); if(c!=null){ org.bitcoinj.core.Coin v=c.getValue(); if(v!=null) totalFrom=totalFrom.add(v); String addr="unknown"; try{addr=c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS).toString();}catch(Exception e){} fromLines.add(addr+" — "+(v!=null?v.toFriendlyString():"")); } } catch(Exception e){}
+    }
+    // FIX 1 & 2: FROM có Total riêng + cách dòng
+    String fromWord = fromLines.size()==1?"input":"inputs";
+    html.append("<b>FROM</b><br><br>");
+    html.append("Total: ").append(totalFrom.toFriendlyString()).append(" from ").append(fromLines.size()).append(" ").append(fromWord).append("<br><br>");
+    for(String l: fromLines) html.append(l).append("<br><br>");
+
+    org.bitcoinj.core.Coin totalTo = org.bitcoinj.core.Coin.ZERO;
+    java.util.List<String> toLines = new java.util.ArrayList<>();
+    for (org.bitcoinj.core.TransactionOutput out : tx.getOutputs()) {
+        try { org.bitcoinj.core.Coin v=out.getValue(); if(v!=null) totalTo=totalTo.add(v); String addr="unknown"; try{addr=out.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS).toString();}catch(Exception e){} toLines.add(addr+" — "+(v!=null?v.toFriendlyString():"")); } catch(Exception e){}
+    }
+    // FIX 1 & 2: TO có Total riêng + cách dòng
+    String toWord = toLines.size()==1?"output":"outputs";
+    html.append("<b>TO</b><br><br>");
+    html.append("Total: ").append(totalTo.toFriendlyString()).append(" to ").append(toLines.size()).append(" ").append(toWord).append("<br><br>");
+    for(String l: toLines) html.append(l).append("<br><br>");
+
+    org.bitcoinj.core.Address actualReceiver=null, actualSender=null;
+    try { actualReceiver = txSent ? WalletUtils.getToAddressOfSent(tx, wallet) : WalletUtils.getWalletAddressOfReceived(tx, wallet); } catch(Exception e){}
+    try { org.bitcoinj.core.Coin max=org.bitcoinj.core.Coin.ZERO; for(org.bitcoinj.core.TransactionInput in:tx.getInputs()){ org.bitcoinj.core.TransactionOutput c=in.getConnectedOutput(); if(c!=null&&c.getValue()!=null&&c.getValue().isGreaterThan(max)){max=c.getValue(); actualSender=c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);} } } catch(Exception e){}
+    html.append("<b>Actual Sender:</b><br>").append(actualSender!=null?actualSender:"unknown").append("<br>");
+    html.append("<b>Actual Receiver:</b><br>").append(actualReceiver!=null?actualReceiver:"unknown");
+
+    android.text.Spanned message = android.text.Html.fromHtml(html.toString(), android.text.Html.FROM_HTML_MODE_LEGACY);
+
+    // FIX 3: thêm nút COPY, giữ nguyên OK và EXPLORER
+    final String plainText = android.text.Html.fromHtml(html.toString()).toString();
+    
+    new android.app.AlertDialog.Builder(activity)
+            .setMessage(message)
+            .setPositiveButton("OK", null)
+            .setNeutralButton("COPY", (d,w)->{
+                try {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager) activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("tx", plainText));
+                    android.widget.Toast.makeText(activity, "Copied", android.widget.Toast.LENGTH_SHORT).show();
+                } catch(Exception e){}
+            })
+            .setNegativeButton("EXPLORER", (d,w)->{
+                try { startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://mempool.space/tx/"+tx.getTxId()))); } catch(Exception e){}
+            })
+            .show();
+}
+    
+//end show transaction
+        
     @Override
     public void onInflateTransactionContextMenu(final MenuInflater inflater, final Menu menu,
                                                 final Sha256Hash transactionId) {
@@ -290,7 +386,10 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
                 .setVisible(txSerialized.length < SHOW_QR_THRESHOLD_BYTES);
         menu.findItem(R.id.wallet_transactions_context_raise_fee)
                 .setVisible(RaiseFeeDialogFragment.feeCanLikelyBeRaised(wallet, tx));
-        menu.findItem(R.id.wallet_transactions_context_browse).setVisible(Constants.ENABLE_BROWSE);
+        menu.findItem(R.id.wallet_transactions_context_browse).setVisible(Constants.ENABLE_BROWSE);   
+     // add ,enu i 1/2
+        menu.findItem(R.id.wallet_transactions_context_show_details).setVisible(true); // add menu i transaction
+        //end add menu i
     }
 
     @Override
@@ -320,6 +419,11 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
             log.info("Viewing transaction {} on {}", transactionId, blockExplorerUri);
             activity.startExternalDocument(Uri.withAppendedPath(blockExplorerUri, "tx/" + transactionId.toString()));
             return true;
+                //add meniU i 2/2
+               } else if (itemId == R.id.wallet_transactions_context_show_details) {
+    showTransactionDetails(transactionId);
+    return true; 
+                //end add menu i
         } else {
             return false;
         }
