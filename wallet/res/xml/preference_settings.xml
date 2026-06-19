@@ -47,7 +47,14 @@
             android:title="@string/preferences_notifications_title"
             android:summary="@string/preferences_notifications_summary" />
     </PreferenceCategory>
-
+    <!--add on/off check new version-->
+    <CheckBoxPreference
+            android:key="enable_version_check"
+            android:title="@string/preferences_enable_version_check_title"
+            android:summary="@string/preferences_enable_version_check_summary"
+            android:defaultValue="true" />
+    </PreferenceCategory>
+    <!--end-->
     <PreferenceCategory
         android:title="@string/preferences_category_privacy">
 
