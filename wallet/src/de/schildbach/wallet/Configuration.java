@@ -287,6 +287,14 @@ public class Configuration {
         prefs.edit().putString(PREFS_KEY_EXCHANGE_CURRENCY, exchangeCurrencyCode).apply();
     }
 
+
+//add check version
+    public boolean isEnableVersionCheck() {
+    return prefs.getBoolean(PREFS_KEY_ENABLE_VERSION_CHECK, true);
+}
+//end
+
+    
     public boolean versionCodeCrossed(final int currentVersionCode, final int triggeringVersionCode) {
         final boolean wasBelow = lastVersionCode < triggeringVersionCode;
         final boolean wasUsedBefore = lastVersionCode > 0;
