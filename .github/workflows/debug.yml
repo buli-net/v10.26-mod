@@ -1,0 +1,130 @@
+# =================================================================
+# FILE: .github/workflows/build-debug.yml
+# MỤC ĐÍCH: Tạo APK đã được ký bằng chữ ký debug mặc định của Android SDK
+#            (dùng cho kiểm thử, không dùng để phát hành)
+# OUTPUT:   bitcoin-wallet-debug.apk (có chữ ký Android Debug)
+# =================================================================
+
+# Tên workflow hiển thị trên GitHub Actions
+name: Build Bitcoin Wallet - Debug
+
+# Chỉ chạy khi người dùng bấm nút "Run workflow" (không tự động)
+on:
+  workflow_dispatch:
+
+# Định nghĩa công việc cần thực hiện
+jobs:
+  build:
+    # Máy ảo chạy Ubuntu 22.04 (chuẩn cho build Android)
+    runs-on: ubuntu-22.04
+
+    # Các bước thực hiện tuần tự
+    steps:
+      # ----- BƯỚC 1: Lấy mã nguồn từ repository -----
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          ref: main               # Lấy nhánh main
+          fetch-depth: 0          # Lấy toàn bộ lịch sử commit (cần cho một số tác vụ)
+
+      # ----- BƯỚC 2: Cài JDK 17 (cần cho Android SDK) -----
+      - name: Setup JDK 17 for Android SDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin   # Bản phân phối OpenJDK từ Adoptium
+          java-version: '17'      # Phiên bản Java 17
+
+      # ----- BƯỚC 3: Cài Android SDK 34 và build-tools 34.0.0 -----
+      - name: Setup Android SDK 34
+        uses: android-actions/setup-android@v3
+        with:
+          # Các gói cần cài: platform-tools, nền tảng API 34, build-tools 34.0.0
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+
+      # ----- BƯỚC 4: Chuyển sang JDK 11 để build (dự án yêu cầu Java 11) -----
+      - name: Setup JDK 11 for build
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      # ----- BƯỚC 5: Cài Gradle 6.9.4 (phiên bản Gradle mà dự án đang dùng) -----
+      - name: Setup Gradle 6.9.4
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '6.9.4'
+
+      # ----- BƯỚC 6: Ép các thư viện về phiên bản tương thích với Gradle 6 -----
+      - name: Force library versions for Gradle 6
+        run: |
+          # Tạo thư mục init.d cho Gradle (nếu chưa có)
+          mkdir -p ~/.gradle/init.d
+          # Tạo script init.gradle để ghi đè phiên bản dependency
+          cat > ~/.gradle/init.d/force.gradle <<'EOF'
+          allprojects {
+            configurations.all {
+              exclude group: 'com.google.guava', module: 'listenablefuture'
+              resolutionStrategy {
+                force 'com.google.guava:guava:31.1-android'
+                eachDependency { d ->
+                  if (d.requested.group.startsWith('androidx.core')) { d.useVersion '1.12.0' }
+                  if (d.requested.group == 'androidx.annotation' && d.requested.name == 'annotation') { d.useVersion '1.7.0' }
+                  if (d.requested.group == 'androidx.annotation' && d.requested.name == 'annotation-experimental') { d.useVersion '1.3.1' }
+                  if (d.requested.group == 'androidx.arch.core') { d.useVersion '2.2.0' }
+                  if (d.requested.group == 'androidx.fragment') { d.useVersion '1.6.2' }
+                  if (d.requested.group == 'androidx.activity') { d.useVersion '1.8.1' }
+                  if (d.requested.group == 'androidx.appcompat') { d.useVersion '1.6.1' }
+                  if (d.requested.group == 'androidx.lifecycle') { d.useVersion '2.6.2' }
+                  if (d.requested.group == 'androidx.viewpager2') { d.useVersion '1.0.0' }
+                  if (d.requested.group == 'androidx.recyclerview') { d.useVersion '1.3.2' }
+                }
+              }
+            }
+          }
+          EOF
+
+      # ----- BƯỚC 7: Build APK với flavor = prod, build type = debug -----
+      - name: Build prodDebug APK
+        run: |
+          # Thiết lập biến môi trường ANDROID_HOME trỏ đến SDK đã cài
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          # Thiết lập JAVA_HOME dùng JDK 11
+          export JAVA_HOME=$JAVA_HOME_11_X64
+          # Chạy Gradle task assembleProdDebug
+          # --no-daemon: không dùng Gradle daemon (tránh lỗi trên CI)
+          # -Pandroid.buildToolsVersion=34.0.0: truyền tham số buildToolsVersion
+          # --stacktrace: in chi tiết lỗi nếu có
+          gradle :wallet:assembleProdDebug --no-daemon -Pandroid.buildToolsVersion=34.0.0 --stacktrace
+
+      # ----- BƯỚC 8: Xác minh chữ ký của APK debug và in thông tin chứng chỉ (PRINT) -----
+      - name: Verify and print debug certificate
+        run: |
+          # Tìm file APK vừa tạo (lấy file .apk đầu tiên tìm thấy)
+          APK_PATH=$(find wallet/build/outputs/apk/prod/debug -name "*.apk" | head -1)
+          echo "=== Xác minh chữ ký APK debug ==="
+          # Dùng apksigner (trong build-tools 34.0.0) để kiểm tra
+          # --verbose: hiển thị chi tiết các lược đồ chữ ký (v1, v2, v3, v4)
+          # --print-certs: in ra thông tin chứng chỉ (Distinguished Name và fingerprint)
+          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose --print-certs "$APK_PATH"
+          # Kết quả mong đợi:
+          # - Verified using v1 scheme: true
+          # - Verified using v2 scheme: true
+          # - Verified using v3 scheme: true
+          # - Signer #1 certificate DN: CN=Android Debug, O=Android, C=US
+          # Điều này chứng tỏ APK đã được ký bằng debug key mặc định
+
+      # ----- BƯỚC 9: Đổi tên file APK cho đúng bản chất (debug) -----
+      - name: Rename APK to bitcoin-wallet-debug.apk
+        run: |
+          APK_PATH=$(find wallet/build/outputs/apk/prod/debug -name "*.apk" | head -1)
+          DIR=$(dirname "$APK_PATH")
+          # Đổi tên file thành bitcoin-wallet-debug.apk
+          mv "$APK_PATH" "$DIR/bitcoin-wallet-debug.apk"
+          echo "Đã đổi tên thành bitcoin-wallet-debug.apk"
+
+      # ----- BƯỚC 10: Upload file APK lên GitHub Actions Artifact (để tải về) -----
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk                    # Tên artifact hiển thị trên giao diện
+          path: wallet/build/outputs/apk/prod/debug/*.apk   # Đường dẫn file (dùng wildcard)
