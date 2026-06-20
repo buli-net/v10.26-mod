@@ -1,42 +1,73 @@
 # =================================================================
 # FILE: .github/workflows/build-10.26-debug.yml
-# MỤC ĐÍCH: Build APK debug cho buli-net/v10.26
-# FIX:
-#  1. Nâng tất cả actions lên bản chạy Node.js 24 (hết cảnh báo deprecated)
-#     - actions/checkout@v4 -> @v5
-#     - actions/setup-java@v4 -> @v5
-#     - android-actions/setup-android@v3 -> @v4
-#     - gradle/actions/setup-gradle@v3 -> @v4
-#  2. Tắt cache Gradle tạm thời (hết cảnh báo "Our services aren't available")
+# MỤC ĐÍCH: Build APK debug cho buli-net/v10.26 (Bitcoin Wallet)
+# TÁC GIẢ: Fix từ bản gốc của bạn
+#
+# LỊCH SỬ FIX:
+#  - 2026-06-21: Nâng tất cả actions lên Node.js 24 để hết cảnh báo deprecated
+#    * actions/checkout@v4 → @v5
+#    * actions/setup-java@v4 → @v5
+#    * android-actions/setup-android@v3 → @v4 (đã migrate Node24)
+#    * gradle/actions/setup-gradle@v3 → @v5 (đã upgrade Node24)
+#    * actions/upload-artifact@v4 → @v6 (bản đầu tiên chạy Node24 mặc định)
+#  - Tắt cache Gradle tạm thời (cache-disabled: true) để tránh lỗi
+#    "Our services aren't available right now" và "Cache service responded with 400"
+#    do GitHub Actions cache backend đang quá tải
+#  - Giữ nguyên logic ép library cho Gradle 6.9.4 (Guava 31.1-android + AndroidX)
+#
+# OUTPUT: bitcoin-wallet-debug.apk (đã ký bằng debug keystore)
 # =================================================================
 
-name: Build Bitcoin Wallet - Debug - test
+name: Build Bitcoin Wallet - Debug
 
 on:
+  # Cho phép chạy thủ công từ tab Actions
   workflow_dispatch:
 
 jobs:
   build:
+    # Ubuntu 22.04 là môi trường ổn định nhất cho Gradle 6.9.4 + JDK 11
     runs-on: ubuntu-22.04
 
     steps:
+      # -----------------------------------------------------------------
+      # BƯỚC 1: Lấy mã nguồn
+      # - fetch-depth: 0 để lấy toàn bộ lịch sử git (cần cho versionCode)
+      # - Dùng checkout@v5 (Node24) thay vì v4 (Node20 deprecated)
+      # -----------------------------------------------------------------
       - name: Checkout source code
         uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0
 
+      # -----------------------------------------------------------------
+      # BƯỚC 2: Cài JDK 17 - CHỈ ĐỂ CHẠY SDKMANAGER
+      # - Từ cmdline-tools 16.0 trở đi, sdkmanager yêu cầu JDK 17+
+      # - Nếu dùng JDK 11 ở bước này sẽ lỗi: "This tool requires JDK 17"
+      # -----------------------------------------------------------------
       - name: Setup JDK 17 for Android SDK
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
+      # -----------------------------------------------------------------
+      # BƯỚC 3: Cài Android SDK
+      # - Dùng setup-android@v4 (đã migrate Node24, fix cảnh báo)
+      # - Cài đúng platform và build-tools mà v10.26 yêu cầu
+      # - build-tools 34.0.0 tương thích với compileSdk 34
+      # -----------------------------------------------------------------
       - name: Setup Android SDK 34
         uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
+      # -----------------------------------------------------------------
+      # BƯỚC 4: Chuyển về JDK 11 - ĐỂ BUILD
+      # - Bitcoin Wallet v10.26 bắt buộc build bằng Java 11 (Gradle 6.9 không hỗ trợ Java 17)
+      # - cache: gradle giữ lại wrapper để lần sau nhanh hơn
+      # -----------------------------------------------------------------
       - name: Setup JDK 11 for build
         uses: actions/setup-java@v5
         with:
@@ -44,21 +75,40 @@ jobs:
           java-version: '11'
           cache: gradle
 
+      # -----------------------------------------------------------------
+      # BƯỚC 5: Cài Gradle 6.9.4
+      # - Dùng setup-gradle@v5 (Node24) thay vì v3/v4
+      # - cache-disabled: true = TẮT cache của GitHub
+      #   Lý do: GitHub đang trả về 400 / "services aren't available"
+      #   Tắt cache không ảnh hưởng APK, chỉ làm build chậm hơn 1-2 phút
+      # -----------------------------------------------------------------
       - name: Setup Gradle 6.9.4
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '6.9.4'
           cache-disabled: true
 
+      # -----------------------------------------------------------------
+      # BƯỚC 6: Ép phiên bản library cho Gradle 6
+      # - Vấn đề gốc: Guava 33+ có 2 variant (android/jre) khiến Gradle 6.9
+      #   không chọn được → lỗi "AmbiguousConfigurationSelectionException"
+      # - Giải pháp: force về Guava 31.1-android (bản cuối Gradle 6 hiểu)
+      # - Đồng thời ép các AndroidX về version tương thích với Gradle 6
+      # -----------------------------------------------------------------
       - name: Force library versions for Gradle 6
         run: |
           mkdir -p ~/.gradle/init.d
           cat > ~/.gradle/init.d/force.gradle <<'EOF'
           allprojects {
             configurations.all {
+              // Loại bỏ xung đột listenablefuture (thường đi kèm Guava mới)
               exclude group: 'com.google.guava', module: 'listenablefuture'
+              
               resolutionStrategy {
+                // Ép Guava về bản an toàn cho Gradle 6
                 force 'com.google.guava:guava:31.1-android'
+                
+                // Ép các AndroidX về version đã test với Gradle 6.9
                 eachDependency { d ->
                   if (d.requested.group.startsWith('androidx.core')) { d.useVersion '1.12.0' }
                   if (d.requested.group == 'androidx.annotation' && d.requested.name == 'annotation') { d.useVersion '1.7.0' }
@@ -76,18 +126,33 @@ jobs:
           }
           EOF
 
+      # -----------------------------------------------------------------
+      # BƯỚC 7: Build APK
+      # - Dùng assembleProdDebug (flavor prod + buildType debug)
+      # - --no-daemon: tránh giữ process Gradle sau build
+      # - -Pandroid.buildToolsVersion=34.0.0: ép đúng build-tools đã cài
+      # -----------------------------------------------------------------
       - name: Build prodDebug APK
         run: |
           export ANDROID_HOME=$ANDROID_SDK_ROOT
           export JAVA_HOME=$JAVA_HOME_11_X64
           gradle :wallet:assembleProdDebug --no-daemon -Pandroid.buildToolsVersion=34.0.0 --stacktrace
 
+      # -----------------------------------------------------------------
+      # BƯỚC 8: Xác minh chữ ký debug
+      # - APK debug được ký tự động bằng keystore ~/.android/debug.keystore
+      # - apksigner verify để đảm bảo APK hợp lệ trước khi upload
+      # -----------------------------------------------------------------
       - name: Verify and print debug certificate
         run: |
           APK_PATH=$(find wallet/build/outputs/apk/prod/debug -name "*.apk" | head -1)
           echo "=== Xác minh chữ ký APK debug ==="
+          echo "Đường dẫn: $APK_PATH"
           $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose --print-certs "$APK_PATH"
 
+      # -----------------------------------------------------------------
+      # BƯỚC 9: Đổi tên file cho dễ nhận biết
+      # -----------------------------------------------------------------
       - name: Rename APK to bitcoin-wallet-debug.apk
         run: |
           APK_PATH=$(find wallet/build/outputs/apk/prod/debug -name "*.apk" | head -1)
@@ -95,8 +160,14 @@ jobs:
           mv "$APK_PATH" "$DIR/bitcoin-wallet-debug.apk"
           echo "Đã đổi tên thành bitcoin-wallet-debug.apk"
 
+      # -----------------------------------------------------------------
+      # BƯỚC 10: Upload artifact
+      # - Dùng upload-artifact@v6 (Node24) thay vì v4 (Node20 deprecated)
+      # - File sẽ xuất hiện trong tab Actions > Artifacts
+      # -----------------------------------------------------------------
       - name: Upload debug APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: debug-apk
           path: wallet/build/outputs/apk/prod/debug/*.apk
+          retention-days: 7
