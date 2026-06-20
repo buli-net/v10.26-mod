@@ -18,7 +18,7 @@
 # OUTPUT: bitcoin-wallet-debug.apk (đã ký bằng debug keystore)
 # =================================================================
 
-name: Build Bitcoin Wallet - Debug
+name: Build Bitcoin Wallet - Debug - Test
 
 on:
   # Cho phép chạy thủ công từ tab Actions
