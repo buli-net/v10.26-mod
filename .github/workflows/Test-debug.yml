@@ -1,10 +1,9 @@
 # =================================================================
 # FILE: .github/workflows/build-10.26-debug.yml
 # MỤC ĐÍCH: Build APK debug cho buli-net/v10.26 (Bitcoin Wallet)
-# PHIÊN BẢN CUỐI 2026-06-21:
-#  - Fix hết cảnh báo Node.js 20 deprecated (nâng tất cả actions lên Node 24)
-#  - Bật lại cache Gradle + bật Build Scan
-#  - Giữ artifact lâu nhất có thể (90 ngày cho repo public)
+# PHIÊN BẢN ỔN ĐỊNH 2026-06-21:
+#  - Nâng tất cả actions lên Node.js 24 (hết cảnh báo deprecated)
+#  - BẬT cache Gradle (basic provider) - TẮT Develocity/Build Scan
 # =================================================================
 
 name: Build Bitcoin Wallet - Debug
@@ -15,14 +14,14 @@ on:
 
 jobs:
   build:
-    # Ubuntu 22.04 ổn định với Gradle 6.9.4 + JDK 11
+    # Ubuntu 22.04 tương thích tốt với Gradle 6.9.4 + JDK 11
     runs-on: ubuntu-22.04
 
     steps:
       # -----------------------------------------------------------------
       # BƯỚC 1: Lấy mã nguồn
       # - actions/checkout@v5 = bản chạy Node 24 (v4 còn Node 20 → bị warning)
-      # - fetch-depth: 0 = lấy full lịch sử git, cần cho versionCode tự động
+      # - fetch-depth: 0 = lấy full lịch sử git
       # -----------------------------------------------------------------
       - name: Checkout source code
         uses: actions/checkout@v5
@@ -32,8 +31,7 @@ jobs:
 
       # -----------------------------------------------------------------
       # BƯỚC 2: Cài JDK 17 (chỉ để chạy sdkmanager)
-      # - Từ Android cmdline-tools 16+, sdkmanager bắt buộc JDK 17+
-      # - Nếu dùng JDK 11 sẽ lỗi: "This tool requires JDK 17 or later"
+      # - cmdline-tools 16+ bắt buộc JDK 17+, nếu dùng JDK 11 sẽ lỗi
       # -----------------------------------------------------------------
       - name: Setup JDK 17 for Android SDK
         uses: actions/setup-java@v5
@@ -43,8 +41,7 @@ jobs:
 
       # -----------------------------------------------------------------
       # BƯỚC 3: Cài Android SDK 34
-      # - android-actions/setup-android@v4 đã migrate sang Node 24
-      # - Cài platform-tools, platform android-34 và build-tools 34.0.0
+      # - android-actions/setup-android@v4 đã migrate Node 24
       # -----------------------------------------------------------------
       - name: Setup Android SDK 34
         uses: android-actions/setup-android@v4
@@ -53,8 +50,7 @@ jobs:
 
       # -----------------------------------------------------------------
       # BƯỚC 4: Chuyển về JDK 11 (để build)
-      # - Bitcoin Wallet v10.26 dùng Gradle 6.9.4 → chỉ tương thích Java 11
-      # - cache: gradle = lưu Gradle wrapper giữa các lần chạy
+      # - Gradle 6.9.4 chỉ chạy ổn với Java 11
       # -----------------------------------------------------------------
       - name: Setup JDK 11 for build
         uses: actions/setup-java@v5
@@ -64,12 +60,11 @@ jobs:
           cache: gradle
 
       # -----------------------------------------------------------------
-      # BƯỚC 5: Cài Gradle + BẬT CACHE + BẬT BUILD SCAN
-      # - gradle/actions/setup-gradle@v5 = bản Node 24 (v4 còn Node 20)
-      # - cache-provider: basic = dùng @actions/cache mã nguồn mở
-      #   → tránh lỗi "Cache service responded with 400" của cache cũ
-      # - build-scan-publish: true → sau build sẽ có link Build Scan
-      #   (xem chi tiết từng task, thời gian, dependency)
+      # BƯỚC 5: Cài Gradle + BẬT CACHE
+      # - gradle/actions/setup-gradle@v5 = Node 24
+      # - cache-provider: basic = dùng @actions/cache (tránh lỗi 400)
+      # - develocity-injection-enabled: false = TẮT plugin Develocity
+      #   (plugin 4.x không tương thích Gradle 6, gây lỗi NoClassDefFoundError)
       # -----------------------------------------------------------------
       - name: Setup Gradle 6.9.4
         uses: gradle/actions/setup-gradle@v5
@@ -77,13 +72,11 @@ jobs:
           gradle-version: '6.9.4'
           cache-disabled: false
           cache-provider: basic
-          build-scan-publish: true
-          build-scan-terms-of-use-url: 'https://gradle.com/terms-of-service'
-          build-scan-terms-of-use-agree: 'yes'
+          develocity-injection-enabled: false
 
       # -----------------------------------------------------------------
-      # BƯỚC 6: Ép phiên bản library (fix lỗi Gradle 6 với Guava mới)
-      # - Guava 33+ có 2 variant khiến Gradle 6.9 không chọn được
+      # BƯỚC 6: Ép phiên bản library (fix lỗi Guava với Gradle 6)
+      # - Guava 33+ có 2 variant khiến Gradle 6 không chọn được
       # - Force về 31.1-android + ép AndroidX về version an toàn
       # -----------------------------------------------------------------
       - name: Force library versions for Gradle 6
@@ -113,18 +106,19 @@ jobs:
           EOF
 
       # -----------------------------------------------------------------
-      # BƯỚC 7: Build APK
-      # - assembleProdDebug = flavor prod + buildType debug
-      # - --scan = tạo Build Scan (kết hợp với setup ở trên)
+      # BƯỚC 7: Build APK prodDebug
+      # - --no-daemon = chạy 1 lần rồi tắt, tiết kiệm RAM trên runner
+      # - -Pandroid.buildToolsVersion=34.0.0 = ép dùng build-tools đã cài
+      # - KHÔNG dùng --scan (tránh kích hoạt Develocity)
       # -----------------------------------------------------------------
       - name: Build prodDebug APK
         run: |
           export ANDROID_HOME=$ANDROID_SDK_ROOT
           export JAVA_HOME=$JAVA_HOME_11_X64
-          gradle :wallet:assembleProdDebug --no-daemon -Pandroid.buildToolsVersion=34.0.0 --scan --stacktrace
+          gradle :wallet:assembleProdDebug --no-daemon -Pandroid.buildToolsVersion=34.0.0 --stacktrace
 
       # -----------------------------------------------------------------
-      # BƯỚC 8: Xác minh chữ ký
+      # BƯỚC 8: Xác minh chữ ký debug
       # -----------------------------------------------------------------
       - name: Verify and print debug certificate
         run: |
@@ -133,7 +127,7 @@ jobs:
           $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose --print-certs "$APK_PATH"
 
       # -----------------------------------------------------------------
-      # BƯỚC 9: Đổi tên file
+      # BƯỚC 9: Đổi tên file cho dễ nhận biết
       # -----------------------------------------------------------------
       - name: Rename APK to bitcoin-wallet-debug.apk
         run: |
@@ -143,11 +137,8 @@ jobs:
 
       # -----------------------------------------------------------------
       # BƯỚC 10: Upload artifact
-      # - actions/upload-artifact@v6 = bản chạy Node 24 (v4/v5 còn Node 20)
-      # - name: debug-apk = tên hiển thị trong tab Artifacts
-      # - path: nơi chứa APK sau khi build
-      # - retention-days: 90 = GIỮ LÂU NHẤT CÓ THỂ cho repo public
-      #   (GitHub chỉ cho phép tối đa 90 ngày với public, 400 ngày với private)
+      # - actions/upload-artifact@v6 = Node 24
+      # - retention-days: 90 = mức tối đa cho repo public
       # -----------------------------------------------------------------
       - name: Upload debug APK
         uses: actions/upload-artifact@v6
