@@ -1,48 +1,89 @@
 # =================================================================
 # FILE: .github/workflows/Test-debug.yml
-# FIX: bỏ cache ở setup-java để setup-gradle cache được
+# DỰ ÁN: buli-net/v10.26 - Bitcoin Wallet (build debug)
+# NGÀY: 2026-06-21 - BẢN ỔN ĐỊNH CUỐI
+# =================================================================
+# MỤC TIÊU:
+#  1. Hết cảnh báo Node.js 20 (dùng actions v5/v6 = Node 24)
+#  2. Bật cache Gradle đúng cách (không xung đột với setup-java)
+#  3. Không dùng Develocity/Build Scan (tránh lỗi với Gradle 6.9.4)
 # =================================================================
 
 name: Build Bitcoin Wallet - Debug
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # chạy thủ công từ tab Actions
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04  # Ubuntu 22.04 tương thích Gradle 6.9.4 + JDK 11
 
     steps:
+      # -----------------------------------------------------------------
+      # 1. CHECKOUT
+      # - actions/checkout@v5: phiên bản mới chạy trên Node 24
+      # - fetch-depth: 0: lấy toàn bộ lịch sử git (cần cho versionCode)
+      # -----------------------------------------------------------------
       - name: Checkout source code
         uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0
 
+      # -----------------------------------------------------------------
+      # 2. JDK 17 cho sdkmanager
+      # - Android cmdline-tools 16+ bắt buộc JDK 17 trở lên
+      # - Chỉ dùng tạm để cài SDK, không dùng để build
+      # -----------------------------------------------------------------
       - name: Setup JDK 17 for Android SDK
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
+      # -----------------------------------------------------------------
+      # 3. ANDROID SDK 34
+      # - android-actions/setup-android@v4 đã lên Node 24
+      # - Cài đúng platform và build-tools mà project yêu cầu
+      # -----------------------------------------------------------------
       - name: Setup Android SDK 34
         uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
+      # -----------------------------------------------------------------
+      # 4. JDK 11 để BUILD
+      # - Gradle 6.9.4 chỉ tương thích Java 11 (dùng Java 17 sẽ lỗi)
+      # - QUAN TRỌNG: KHÔNG thêm 'cache: gradle' ở đây
+      #   -> nếu thêm, setup-java sẽ tạo ~/.gradle trước,
+      #      làm setup-gradle phải tắt cache (lỗi bạn gặp trước đó)
+      # -----------------------------------------------------------------
       - name: Setup JDK 11 for build
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '11'
-          # BỎ DÒNG cache: gradle Ở ĐÂY
 
+      # -----------------------------------------------------------------
+      # 5. SETUP GRADLE + CACHE
+      # - gradle/actions/setup-gradle@v5: Node 24, quản lý cache chuẩn
+      # - gradle-version: '6.9.4': ép đúng version project cần
+      # - cache-disabled: false: bật cache (mặc định)
+      # - Kết quả như ảnh bạn gửi:
+      #   * Lần 1: Entries Saved 4 (159 MB)
+      #   * Lần 2+: Entries Restored 4 (159 MB) -> build nhanh hơn
+      # -----------------------------------------------------------------
       - name: Setup Gradle 6.9.4
         uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '6.9.4'
           cache-disabled: false
 
+      # -----------------------------------------------------------------
+      # 6. FORCE LIBRARY VERSIONS
+      # - Gradle 6 không chọn được Guava 33+ (có 2 variant)
+      # - Ép về guava:31.1-android và các AndroidX ổn định
+      # -----------------------------------------------------------------
       - name: Force library versions for Gradle 6
         run: |
           mkdir -p ~/.gradle/init.d
@@ -69,23 +110,43 @@ jobs:
           }
           EOF
 
+      # -----------------------------------------------------------------
+      # 7. BUILD APK
+      # - --no-daemon: không giữ daemon, tiết kiệm RAM runner
+      # - -Pandroid.buildToolsVersion=34.0.0: ép đúng build-tools
+      # - --stacktrace: in lỗi chi tiết nếu fail
+      # -----------------------------------------------------------------
       - name: Build prodDebug APK
         run: |
           export ANDROID_HOME=$ANDROID_SDK_ROOT
           export JAVA_HOME=$JAVA_HOME_11_X64
           gradle :wallet:assembleProdDebug --no-daemon -Pandroid.buildToolsVersion=34.0.0 --stacktrace
 
+      # -----------------------------------------------------------------
+      # 8. VERIFY
+      # - Kiểm tra chữ ký debug bằng apksigner
+      # -----------------------------------------------------------------
       - name: Verify and print debug certificate
         run: |
           APK_PATH=$(find wallet/build/outputs/apk/prod/debug -name "*.apk" | head -1)
+          echo "=== Xác minh chữ ký APK debug ==="
           $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose --print-certs "$APK_PATH"
 
+      # -----------------------------------------------------------------
+      # 9. RENAME
+      # - Đổi tên cho dễ tải về
+      # -----------------------------------------------------------------
       - name: Rename APK to bitcoin-wallet-debug.apk
         run: |
           APK_PATH=$(find wallet/build/outputs/apk/prod/debug -name "*.apk" | head -1)
           DIR=$(dirname "$APK_PATH")
           mv "$APK_PATH" "$DIR/bitcoin-wallet-debug.apk"
 
+      # -----------------------------------------------------------------
+      # 10. UPLOAD ARTIFACT
+      # - actions/upload-artifact@v6: Node 24
+      # - retention-days: 90: giữ tối đa cho repo public
+      # -----------------------------------------------------------------
       - name: Upload debug APK
         uses: actions/upload-artifact@v6
         with:
