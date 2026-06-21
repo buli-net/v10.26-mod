@@ -1,5 +1,9 @@
 v10.26 mod by buli
 
+* - 21/6/2026
++ update email report: bitcoin.wallet.developers@gmail.com --> hvlrcb@gmail.com
+- wallet/src/de/schildbach/wallet/Constants.java [ // line 137, add code line 138]
+
 * - 19/6/2026
 + Fix theme ui setting bug light/dark
 - wallet/AndroidManifest.xml [ add line 181, comment line 182->184]
