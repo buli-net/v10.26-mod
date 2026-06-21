@@ -85,7 +85,7 @@ jobs:
           EOF
 
       # ----- BƯỚC 7: Build 4 biến thể -----
-      - name: Build all APK variants (including real releases)
+      - name: Build all APK variants
         run: |
           export ANDROID_HOME=$ANDROID_SDK_ROOT
           export JAVA_HOME=$JAVA_HOME_11_X64
@@ -101,7 +101,7 @@ jobs:
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
 
       # ----- BƯỚC 9: Ký devRelease -----
-      - name: Sign devRelease APK (real release)
+      - name: Sign devRelease APK
         run: |
           APK_PATH=$(find wallet/build/outputs/apk/dev/release -name "*.apk" | head -1)
           $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
@@ -112,7 +112,7 @@ jobs:
             "$APK_PATH"
 
       # ----- BƯỚC 10: Ký prodRelease -----
-      - name: Sign prodRelease APK (real release)
+      - name: Sign prodRelease APK
         run: |
           APK_PATH=$(find wallet/build/outputs/apk/prod/release -name "*.apk" | head -1)
           $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
@@ -163,7 +163,7 @@ jobs:
           rmdir wallet/build/outputs/apk/final
 
       # ----- BƯỚC 14: Upload 4 APK -----
-      - name: Upload all APKs (including real releases)
+      - name: Upload all APKs
         uses: actions/upload-artifact@v6   # FIX: v6 = Node 24
         with:
           name: bitcoin-wallet-all-variants
