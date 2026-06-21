@@ -1,10 +1,6 @@
 # =================================================================
 # FILE: .github/workflows/Test-debug.yml
-# MỤC ĐÍCH: Build APK debug cho buli-net/v10.26 (Bitcoin Wallet)
-# BẢN FIX 2026-06-21:
-#  - Dùng actions Node 24 (hết warning)
-#  - BẬT cache Gradle mặc định (không dùng cache-provider)
-#  - TẮT Develocity (tránh lỗi với Gradle 6.9.4)
+# FIX: bỏ cache ở setup-java để setup-gradle cache được
 # =================================================================
 
 name: Build Bitcoin Wallet - Debug
@@ -17,59 +13,36 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # -----------------------------------------------------------------
-      # BƯỚC 1: Lấy mã nguồn
-      # - actions/checkout@v5 chạy Node 24
-      # -----------------------------------------------------------------
       - name: Checkout source code
         uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0
 
-      # -----------------------------------------------------------------
-      # BƯỚC 2: JDK 17 cho sdkmanager
-      # -----------------------------------------------------------------
       - name: Setup JDK 17 for Android SDK
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      # -----------------------------------------------------------------
-      # BƯỚC 3: Android SDK 34
-      # -----------------------------------------------------------------
       - name: Setup Android SDK 34
         uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
-      # -----------------------------------------------------------------
-      # BƯỚC 4: JDK 11 để build (Gradle 6.9.4 yêu cầu Java 11)
-      # -----------------------------------------------------------------
       - name: Setup JDK 11 for build
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '11'
-          cache: gradle
+          # BỎ DÒNG cache: gradle Ở ĐÂY
 
-      # -----------------------------------------------------------------
-      # BƯỚC 5: Setup Gradle 6.9.4 + CACHE
-      # - uses: v5 = Node 24, không còn warning
-      # - cache-disabled: false = bật cache (mặc định của v5)
-      # - KHÔNG dùng 'cache-provider' vì v5 chưa hỗ trợ -> gây warning
-      # - KHÔNG bật build-scan/develocity -> tránh lỗi NoClassDefFoundError
-      # -----------------------------------------------------------------
       - name: Setup Gradle 6.9.4
         uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '6.9.4'
           cache-disabled: false
 
-      # -----------------------------------------------------------------
-      # BƯỚC 6: Ép Guava và AndroidX (fix lỗi Gradle 6)
-      # -----------------------------------------------------------------
       - name: Force library versions for Gradle 6
         run: |
           mkdir -p ~/.gradle/init.d
@@ -96,35 +69,23 @@ jobs:
           }
           EOF
 
-      # -----------------------------------------------------------------
-      # BƯỚC 7: Build APK
-      # -----------------------------------------------------------------
       - name: Build prodDebug APK
         run: |
           export ANDROID_HOME=$ANDROID_SDK_ROOT
           export JAVA_HOME=$JAVA_HOME_11_X64
           gradle :wallet:assembleProdDebug --no-daemon -Pandroid.buildToolsVersion=34.0.0 --stacktrace
 
-      # -----------------------------------------------------------------
-      # BƯỚC 8: Verify chữ ký
-      # -----------------------------------------------------------------
       - name: Verify and print debug certificate
         run: |
           APK_PATH=$(find wallet/build/outputs/apk/prod/debug -name "*.apk" | head -1)
           $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose --print-certs "$APK_PATH"
 
-      # -----------------------------------------------------------------
-      # BƯỚC 9: Đổi tên
-      # -----------------------------------------------------------------
       - name: Rename APK to bitcoin-wallet-debug.apk
         run: |
           APK_PATH=$(find wallet/build/outputs/apk/prod/debug -name "*.apk" | head -1)
           DIR=$(dirname "$APK_PATH")
           mv "$APK_PATH" "$DIR/bitcoin-wallet-debug.apk"
 
-      # -----------------------------------------------------------------
-      # BƯỚC 10: Upload artifact (giữ 90 ngày)
-      # -----------------------------------------------------------------
       - name: Upload debug APK
         uses: actions/upload-artifact@v6
         with:
