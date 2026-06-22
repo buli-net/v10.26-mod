@@ -67,7 +67,8 @@
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="https" android:host="wallet.schildbach.de" />
+         <!--   <data android:scheme="https" android:host="wallet.schildbach.de" />-->
+            <data android:scheme="https" android:host="raw.githubusercontent.com" />
         </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
