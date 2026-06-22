@@ -12,7 +12,7 @@
     <domain-config cleartextTrafficPermitted="false">
         <!-- Our own domain to fetch new version notifications from. -->
         <!--<domain includeSubdomains="true">wallet.schildbach.de</domain>-->
-        <domain includeSubdomains="true">cdn.jsdelivr.net</domain>
+        <domain includeSubdomains="true">github.com</domain>
         <!-- Various domains to fetch exchange rates from. -->
         <domain includeSubdomains="true">coingecko.com</domain>
         <domain includeSubdomains="true">bitcoinaverage.com</domain>
