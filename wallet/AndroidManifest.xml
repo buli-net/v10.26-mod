@@ -68,7 +68,7 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
          <!--   <data android:scheme="https" android:host="wallet.schildbach.de" />-->
-            <data android:scheme="https" android:host="github.com" />
+            <data android:scheme="https" android:host="raw.githubusercontent.com/buli-net/buli-net.github.io/main" />
     
         </intent>
         <intent>
