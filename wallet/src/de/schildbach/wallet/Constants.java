@@ -111,7 +111,7 @@ public final class Constants {
    // public static final HttpUrl VERSION_URL = HttpUrl.parse("https://wallet.schildbach.de/version"
            // + (NETWORK_PARAMETERS.getId().equals(NetworkParameters.ID_MAINNET) ? "" : "-test"));
 
-  public static final HttpUrl VERSION_URL = HttpUrl.parse("https://cdn.jsdelivr.net/gh/buli-net/buli-net.github.io@main/version");
+  public static final HttpUrl VERSION_URL = HttpUrl.parse("https://github.com/buli-net/buli-net.github.io/blob/main/version");
     /** URL to fetch dynamic fees from. */
     public static final HttpUrl DYNAMIC_FEES_URL = HttpUrl.parse("https://wallet.schildbach.de/fees"
             + (NETWORK_PARAMETERS.getId().equals(NetworkParameters.ID_MAINNET) ? "" : "-test"));
