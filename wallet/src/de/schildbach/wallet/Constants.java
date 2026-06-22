@@ -109,7 +109,7 @@ public final class Constants {
 
     /** URL to fetch version alerts from. */
    // public static final HttpUrl VERSION_URL = HttpUrl.parse("https://wallet.schildbach.de/version"
-    public static final HttpUrl VERSION_URL = HttpUrl.parse("https://buli-net.github.io/version");
+    public static final HttpUrl VERSION_URL = HttpUrl.parse("https://buli-net.github.io/version"
             + (NETWORK_PARAMETERS.getId().equals(NetworkParameters.ID_MAINNET) ? "" : "-test"));
 
     /** URL to fetch dynamic fees from. */
