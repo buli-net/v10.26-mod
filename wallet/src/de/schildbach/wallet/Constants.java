@@ -110,10 +110,8 @@ public final class Constants {
     /** URL to fetch version alerts from. */
    // public static final HttpUrl VERSION_URL = HttpUrl.parse("https://wallet.schildbach.de/version"
            // + (NETWORK_PARAMETERS.getId().equals(NetworkParameters.ID_MAINNET) ? "" : "-test"));
-public static final HttpUrl VERSION_URL = HttpUrl.parse(
-    "https://raw.githubusercontent.com/buli-net/buli-net.github.io/main/version"
-    + (NETWORK_PARAMETERS.getId().equals(NetworkParameters.ID_MAINNET) ? "" : "-test"));
-    
+
+  public static final HttpUrl VERSION_URL = HttpUrl.parse("https://cdn.jsdelivr.net/gh/buli-net/buli-net.github.io@main/version");
     /** URL to fetch dynamic fees from. */
     public static final HttpUrl DYNAMIC_FEES_URL = HttpUrl.parse("https://wallet.schildbach.de/fees"
             + (NETWORK_PARAMETERS.getId().equals(NetworkParameters.ID_MAINNET) ? "" : "-test"));
