@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buli Wallet — Bitcoin Self-Hosted</title>
+<link rel="icon" href="https://upload.wikimedia.org/wikipedia/commons/4/46/Bitcoin.svg">
+<style>
+  :root{--bg:#0a0b0d;--card:#14161b;--text:#eaeaea;--muted:#9aa0a6;--btc:#f7931a}
+  *{box-sizing:border-box}html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 Inter,system-ui,Segoe UI,Roboto;overflow-x:hidden}
+  .hero{position:relative;min-height:38vh;display:grid;place-items:center;text-align:center;padding:60px 20px;
+    background:radial-gradient(1200px 600px at 50% -10%, #1f242d 0%, var(--bg) 60%);}
+  .hero::before{content:"";position:absolute;inset:0;opacity:.08;background:url('https://upload.wikimedia.org/wikipedia/commons/4/46/Bitcoin.svg') center/480px no-repeat;filter:grayscale(20%)}
+  .logo{width:64px;height:64px;border-radius:50%;background:var(--btc);display:grid;place-items:center;font-weight:900;color:#111;font-size:32px;box-shadow:0 8px 30px #f7931a33;margin:0 auto 14px}
+  h1{margin:0;font-size:34px;letter-spacing:.3px}
+  .sub{color:var(--muted);margin-top:6px}
+  .wrap{max-width:980px;margin:-40px auto 0;padding:0 20px 60px;position:relative}
+  .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px} @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,#171a20,#121418);border:1px solid #222630;border-radius:18px;padding:22px;backdrop-filter:blur(6px)}
+  .card h2,.card h3{margin:0 0 8px}
+  a{color:var(--btc);text-decoration:none} a:hover{text-decoration:underline}
+  code{background:#1d2129;border:1px solid #2a2f3a;padding:2px 6px;border-radius:6px}
+  .btn{display:inline-block;background:var(--btc);color:#111;font-weight:700;padding:10px 16px;border-radius:10px;margin-top:10px}
+  .btn:hover{filter:brightness(1.05)}
+  .muted{color:var(--muted)}
+  footer{color:var(--muted);text-align:center;padding:30px 0;font-size:13px}
+  .chain{height:4px;background:repeating-linear-gradient(90deg,var(--btc) 0 24px,#0000 24px 48px);opacity:.25;border-radius:4px;margin:14px 0}
+</style>
+</head>
+<body>
+  <section class="hero">
+    <div>
+      <div class="logo">₿</div>
+      <h1>Buli Wallet</h1>
+      <div class="sub">Bitcoin Wallet mirror • kiểm soát version của riêng bạn</div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <div class="grid">
+      <div class="card">
+        <h2>Endpoint đang chạy</h2>
+        <div class="chain"></div>
+        <p>App sẽ check tại: <a href="/version"><code>https://buli-net.github.io/version</code></a></p>
+        <p class="muted">File text thuần 3 dòng, không HTML – giống hệt wallet.schildbach.de</p>
+        <a class="btn" href="/version">Xem /version</a>
+      </div>
+
+      <div class="card">
+        <h3>Self-custody</h3>
+        <p>Không server trung gian. Private key nằm trên máy bạn. Dùng mạng Bitcoin mainnet, tự chịu trách nhiệm.</p>
+        <img src="https://images.unsplash.com/photo-1621761191319-c6fb62004040?q=80&w=800&auto=format" alt="bitcoin" style="width:100%;border-radius:12px;margin-top:10px;opacity:.9">
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <h3>Dev notes (3 file phải sửa)</h3>
+      <ul>
+        <li><code>Constants.java</code> → <code>VERSION_URL = https://buli-net.github.io/version</code></li>
+        <li><code>network_security_config.xml</code> → thêm domain <code>buli-net.github.io</code></li>
+        <li><code>AndroidManifest.xml</code> → intent-filter host <code>buli-net.github.io</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>© 2026 Buli Net • Built for Bitcoiners. Not affiliated with Schildbach.</footer>
+</body>
+</html>
