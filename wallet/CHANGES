@@ -1,11 +1,18 @@
 v10.26 mod by buli
 
 * - 22/06/2026
-+ update link check version wallet.schildbach.de -> buli-net.github.io
++ update link check version wallet.schildbach.de/version -> buli-net.github.io/version
 - wallet/src/de/schildbach/wallet/Constants.java [ // line 111. add code line 112 ]
 - wallet/res/xml/network_security_config.xml [ // line 14. add code line 15 ]
 - wallet/AndroidManifest.xml [ // line 70. add code line 71 ]
-- Create 2 file: buli-net.github.io/index.html & buli-net.github.io/version
+- Create file: buli-net.github.io/version
+
++ update link check fees wallet.schildbach.de/fees ->. buli-net.github.io/fees
+- wallet/src/de/schildbach/wallet/Constants.java [ // line 116. add code line 117 ]
+- Create file buli-net.github.io/fees
+
++ Create index
+- Create file buli-net.github.io/index.html
 
 
 
