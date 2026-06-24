@@ -29,9 +29,10 @@ v10.26 mod by buli
 - wallet/res/values-night/colors.xml [ add code line 11 ]
 
 + Add button [i] show transaction
-- Create file wallet/res/drawable/ic_info_white_24dp.xml
+- Create file wallet/res/drawable/ic_info_white_24dp.xml [ icon (i) ]
+- Create file wallet/res/drawable/ic_copy.xml [ icon coppy ]
 - Add code file wallet/res/menu/wallet_transactions_context.xml [ add code line 11->15 ]
-- Add code file wallet/src/de/schildbach/wallet/ui/WalletTransactionsFragment.java [ add code line 261->355,390->392, 422->426]
+- Add code file wallet/src/de/schildbach/wallet/ui/WalletTransactionsFragment.java [ add code line 261->475,510->512, 542->546]
 
 + Add bar sync block start app
 - wallet/src/net/buli/w/ui/WalletActivity.java 
