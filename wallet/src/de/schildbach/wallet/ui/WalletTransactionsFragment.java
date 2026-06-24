@@ -279,10 +279,20 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     String timeStr = updateTime != null ? new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(updateTime) : "n/a";
 
     int vsize = (tx.getWeight() + 3) / 4;
-    boolean isSegWit = tx.hasWitness();
     boolean isCoinbase = tx.isCoinBase();
-    int version = tx.getVersion();
+    long version = tx.getVersion();
     long locktime = tx.getLockTime();
+
+    // detect SegWit by bc1 address (API cũ không có hasWitness)
+    boolean isSegWit = false;
+    try {
+        for (org.bitcoinj.core.TransactionOutput o : tx.getOutputs()) {
+            try {
+                org.bitcoinj.core.Address a = o.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
+                if (a != null && a.toString().startsWith("bc1")) { isSegWit = true; break; }
+            } catch (Exception e) {}
+        }
+    } catch (Exception e) {}
 
     String status = confs<=0?"PENDING":confs<6?"BUILDING":"CONFIRMED";
     String statusColor = status.equals("PENDING")?"#FFA726":status.equals("BUILDING")?"#29B6F6":"#66BB6A";
@@ -315,16 +325,24 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
             if(v!=null) totalTo = totalTo.add(v);
             String addr = "unknown";
             String type = "nonstandard";
-            try{
-                if(out.getScriptPubKey().isOpReturn()){
+            try {
+                if (out.getScriptPubKey().isOpReturn()) {
                     type = "OP_RETURN";
-                    try{ opReturnData = new String(out.getScriptPubKey().getChunks().get(1).data, "UTF-8"); }catch(Exception e){}
-                } else if(out.getScriptPubKey().isPayToWitnessPubKeyHash()) type = "P2WPKH";
-                else if(out.getScriptPubKey().isPayToWitnessScriptHash()) type = "P2WSH";
-                else if(out.getScriptPubKey().isPayToScriptHash()) type = "P2SH";
-                else if(out.getScriptPubKey().isSentToP2PKH()) type = "P2PKH";
-                addr = out.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS).toString();
-            }catch(Exception e){}
+                    try { opReturnData = new String(out.getScriptPubKey().getChunks().get(1).data, "UTF-8"); } catch (Exception e) {}
+                } else {
+                    try {
+                        org.bitcoinj.core.Address a = out.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
+                        if (a != null) {
+                            addr = a.toString();
+                            if (addr.startsWith("bc1q")) type = "P2WPKH";
+                            else if (addr.startsWith("bc1p")) type = "P2TR";
+                            else if (addr.startsWith("bc1")) type = "P2WSH";
+                            else if (addr.startsWith("3")) type = "P2SH";
+                            else if (addr.startsWith("1")) type = "P2PKH";
+                        }
+                    } catch (Exception e) {}
+                }
+            } catch (Exception e) {}
             toLines.add(addr + " — " + (v!=null?v.toFriendlyString():""));
             outDetails.add("#" + i + " " + type + " " + (v!=null?v.toFriendlyString():""));
         }catch(Exception e){}
@@ -387,7 +405,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     tvOver.setText("\nOVERVIEW");
     tvOver.setTypeface(null, android.graphics.Typeface.BOLD);
     root.addView(tvOver);
-
     StringBuilder info = new StringBuilder();
     info.append("<b>Time:</b> ").append(timeStr).append("<br>");
     info.append("<b>Confirmations:</b> ").append(confs).append("<br>");
@@ -432,7 +449,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     tvFromH.setText("\nFROM");
     tvFromH.setTypeface(null, android.graphics.Typeface.BOLD);
     root.addView(tvFromH);
-
     android.widget.LinearLayout fromHead = new android.widget.LinearLayout(ctx);
     fromHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvFromTot = new android.widget.TextView(ctx);
@@ -447,7 +463,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     ivFromAll.setOnClickListener(copyListener);
     fromHead.addView(ivFromAll);
     root.addView(fromHead);
-
     for(String l: fromLines){
         android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
         row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
@@ -468,7 +483,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     tvToH.setText("\nTO");
     tvToH.setTypeface(null, android.graphics.Typeface.BOLD);
     root.addView(tvToH);
-
     android.widget.LinearLayout toHead = new android.widget.LinearLayout(ctx);
     toHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvToTot = new android.widget.TextView(ctx);
@@ -483,7 +497,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     ivToAll.setOnClickListener(copyListener);
     toHead.addView(ivToAll);
     root.addView(toHead);
-
     for(String l: toLines){
         android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
         row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
@@ -522,7 +535,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     tvWal.setText("\nWALLET");
     tvWal.setTypeface(null, android.graphics.Typeface.BOLD);
     root.addView(tvWal);
-
     android.widget.LinearLayout rowAS = new android.widget.LinearLayout(ctx);
     rowAS.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvAS = new android.widget.TextView(ctx);
@@ -549,7 +561,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     rowAR.addView(tvAR); rowAR.addView(ivAR);
     root.addView(rowAR);
 
-    // COPY ALL
     final StringBuilder plain = new StringBuilder();
     plain.append(txSent?"Sent":"Receive").append("\n").append(tx.getTxId()).append("\n\n");
     plain.append("Time: ").append(timeStr).append("\nConfirmations: ").append(confs).append("\nBlock: ").append(height>0?height:"unconfirmed").append("\nStatus: ").append(status).append("\nNet: ").append(netValue!=null?netValue.toFriendlyString():"-").append("\n\n");
