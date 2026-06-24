@@ -356,7 +356,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
 
         ////////////////test
 
-public void showTransactionDetails(final Sha256Hash transactionId) {
+    public void showTransactionDetails(final Sha256Hash transactionId) {
     viewModel.selectedTransaction.setValue(transactionId);
     final Wallet wallet = viewModel.wallet.getValue();
     final Transaction tx = wallet.getTransaction(transactionId);
@@ -418,7 +418,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         }
     };
 
-    // ---- HEADER ----
+    // HEADER
     android.widget.LinearLayout header = new android.widget.LinearLayout(ctx);
     header.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvTitle = new android.widget.TextView(ctx);
@@ -426,11 +426,9 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     tvTitle.setTextSize(22); tvTitle.setTypeface(null,android.graphics.Typeface.BOLD);
     tvTitle.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
     header.addView(tvTitle);
-
     android.widget.ImageView ivCopyTx = new android.widget.ImageView(ctx);
     ivCopyTx.setImageResource(R.drawable.ic_copy);
     ivCopyTx.setColorFilter(tvTitle.getCurrentTextColor());
-    ivCopyTx.setPadding(pad,0,0,0);
     ivCopyTx.setTag((txSent?"Sent":"Receive")+"\n"+tx.getTxId().toString());
     ivCopyTx.setOnClickListener(copyListener);
     header.addView(ivCopyTx);
@@ -440,7 +438,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     tvHash.setText(tx.getTxId().toString()); tvHash.setTextIsSelectable(true);
     root.addView(tvHash);
 
-    // ---- INFO ----
+    // INFO
     StringBuilder info = new StringBuilder();
     info.append("<br><b>Time:</b> ").append(timeStr).append("<br>");
     info.append("<b>Confirmations:</b> ").append(confs).append("<br>");
@@ -456,18 +454,20 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
 
     int iconColor = tvTitle.getCurrentTextColor();
 
-    // ---- FROM ----
+    // FROM
+    StringBuilder fromAll = new StringBuilder();
+    fromAll.append("Total: ").append(totalFrom.toFriendlyString()).append(" from ").append(fromLines.size()).append("\n\n");
+    for(String l: fromLines) fromAll.append(l).append("\n");
+
     android.widget.LinearLayout fromHead = new android.widget.LinearLayout(ctx);
     fromHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvFromH = new android.widget.TextView(ctx);
     tvFromH.setText("FROM"); tvFromH.setTypeface(null,android.graphics.Typeface.BOLD);
     tvFromH.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
     fromHead.addView(tvFromH);
-    StringBuilder fromAll = new StringBuilder("FROM\n\nTotal: ").append(totalFrom.toFriendlyString()).append(" from ").append(fromLines.size()).append("\n\n");
-    for(String l:fromLines) fromAll.append(l).append("\n");
     android.widget.ImageView ivFromAll = new android.widget.ImageView(ctx);
     ivFromAll.setImageResource(R.drawable.ic_copy); ivFromAll.setColorFilter(iconColor);
-    ivFromAll.setTag(fromAll.toString().trim()); ivFromAll.setOnClickListener(copyListener);
+    ivFromAll.setTag("FROM\n\n"+fromAll.toString().trim()); ivFromAll.setOnClickListener(copyListener);
     fromHead.addView(ivFromAll);
     root.addView(fromHead);
 
@@ -475,7 +475,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     tvFromTot.setText("Total: "+totalFrom.toFriendlyString()+" from "+fromLines.size());
     root.addView(tvFromTot);
 
-    for(String l:fromLines){
+    for(String l: fromLines){
         android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
         row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         android.widget.TextView tv = new android.widget.TextView(ctx);
@@ -486,18 +486,20 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         row.addView(tv); row.addView(iv); root.addView(row);
     }
 
-    // ---- TO ----
+    // TO
+    StringBuilder toAll = new StringBuilder();
+    toAll.append("Total: ").append(totalTo.toFriendlyString()).append(" to ").append(toLines.size()).append("\n\n");
+    for(String l: toLines) toAll.append(l).append("\n");
+
     android.widget.LinearLayout toHead = new android.widget.LinearLayout(ctx);
     toHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvToH = new android.widget.TextView(ctx);
     tvToH.setText("TO"); tvToH.setTypeface(null,android.graphics.Typeface.BOLD);
     tvToH.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
     toHead.addView(tvToH);
-    StringBuilder toAll = new StringBuilder("TO\n\nTotal: ").append(totalTo.toFriendlyString()).append(" to ").append(toLines.size()).append("\n\n");
-    for(String l:toLines) toAll.append(l).append("\n");
     android.widget.ImageView ivToAll = new android.widget.ImageView(ctx);
     ivToAll.setImageResource(R.drawable.ic_copy); ivToAll.setColorFilter(iconColor);
-    ivToAll.setTag(toAll.toString().trim()); ivToAll.setOnClickListener(copyListener);
+    ivToAll.setTag("TO\n\n"+toAll.toString().trim()); ivToAll.setOnClickListener(copyListener);
     toHead.addView(ivToAll);
     root.addView(toHead);
 
@@ -505,7 +507,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     tvToTot.setText("Total: "+totalTo.toFriendlyString()+" to "+toLines.size());
     root.addView(tvToTot);
 
-    for(String l:toLines){
+    for(String l: toLines){
         android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
         row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         android.widget.TextView tv = new android.widget.TextView(ctx);
@@ -516,7 +518,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         row.addView(tv); row.addView(iv); root.addView(row);
     }
 
-    // ---- Actual ----
+    // Actual
     android.widget.TextView tvAS = new android.widget.TextView(ctx); tvAS.setText("Actual Sender:"); tvAS.setTypeface(null,android.graphics.Typeface.BOLD); root.addView(tvAS);
     android.widget.LinearLayout rowAS = new android.widget.LinearLayout(ctx); rowAS.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvASv = new android.widget.TextView(ctx); tvASv.setText(actualSender!=null?actualSender.toString():"unknown"); tvASv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
@@ -528,30 +530,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     android.widget.LinearLayout rowAR = new android.widget.LinearLayout(ctx); rowAR.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvARv = new android.widget.TextView(ctx); tvARv.setText(actualReceiver!=null?actualReceiver.toString():"unknown"); tvARv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
     android.widget.ImageView ivAR = new android.widget.ImageView(ctx); ivAR.setImageResource(R.drawable.ic_copy); ivAR.setColorFilter(iconColor);
-    ivAR.setTag("Actual Receiver:\n"+(actualReceiver!=null?actualReceiver:"unknown")); ivAR.setOnClickListener(copyListener);
-    rowAR.addView(tvARv); rowAR.addView(ivAR); root.addView(rowAR);
-
-    // ---- plain ALL ----
-    StringBuilder plain = new StringBuilder();
-    plain.append(txSent?"Sent":"Receive").append("\n").append(tx.getTxId()).append("\n\n");
-    plain.append("Time: ").append(timeStr).append("\nConfirmations: ").append(confs).append("\nBlock: ").append(height>0?height:"unconfirmed").append("\n\n");
-    plain.append("FROM\n").append(fromAll).append("\nTO\n").append(toAll).append("\n");
-    plain.append("Actual Sender:\n").append(actualSender).append("\nActual Receiver:\n").append(actualReceiver);
-    final String plainAll = plain.toString();
-
-    new android.app.AlertDialog.Builder(activity)
-        .setView(scroll)
-        .setPositiveButton("OK",null)
-        .setNeutralButton("COPY ALL",(d,w)->{
-            android.content.ClipboardManager cm=(android.content.ClipboardManager)ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-            cm.setPrimaryClip(android.content.ClipData.newPlainText("tx",plainAll));
-            android.widget.Toast.makeText(ctx,"Copied all",android.widget.Toast.LENGTH_SHORT).show();
-        })
-        .setNegativeButton("EXPLORER",(d,w)->{
-            try{ activity.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse("https://mempool.space/tx/"+tx.getTxId()))); }catch(Exception e){}
-        })
-        .show();
-}
+    ivAR.setTag("Actual Receiver:\n"+(actualReceiver!=null?actualReceiver:"unknown")); ivAR
 
 //end show transaction
         
