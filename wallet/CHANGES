@@ -32,7 +32,7 @@ v10.26 mod by buli
 - Create file wallet/res/drawable/ic_info_white_24dp.xml [ icon (i) ]
 - Create file wallet/res/drawable/ic_copy.xml [ icon coppy ]
 - Add code file wallet/res/menu/wallet_transactions_context.xml [ add code line 11->15 ]
-- Add code file wallet/src/de/schildbach/wallet/ui/WalletTransactionsFragment.java [ add code line 261->475,510->512, 542->546]
+- Add code file wallet/src/de/schildbach/wallet/ui/WalletTransactionsFragment.java [ add code line 261->703,738->740, 770->774]
 
 + Add bar sync block start app
 - wallet/src/net/buli/w/ui/WalletActivity.java 
