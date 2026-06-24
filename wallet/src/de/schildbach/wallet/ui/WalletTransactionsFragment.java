@@ -260,46 +260,55 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
 
         //add show transaction
 
-public void showTransactionDetails(final Sha256Hash transactionId) {
+        public void showTransactionDetails(final Sha256Hash transactionId) {
     viewModel.selectedTransaction.setValue(transactionId);
     final Wallet wallet = viewModel.wallet.getValue();
     final Transaction tx = wallet.getTransaction(transactionId);
-    if (tx == null) return;
+    if (tx == null) {
+        return;
+    }
 
     boolean txSent = false;
     try {
         txSent = wallet != null && tx.getValue(wallet).signum() < 0;
-    } catch (Exception e) {}
+    } catch (Exception e) {
+    }
 
     org.bitcoinj.core.Coin netValue = null;
     try {
         netValue = tx.getValue(wallet);
-    } catch (Exception e) {}
+    } catch (Exception e) {
+    }
 
     int confs = 0;
     try {
         confs = tx.getConfidence().getDepthInBlocks();
-    } catch (Exception e) {}
+    } catch (Exception e) {
+    }
 
     int height = 0;
     try {
         height = tx.getConfidence().getAppearedAtChainHeight();
-    } catch (Exception e) {}
+    } catch (Exception e) {
+    }
 
     org.bitcoinj.core.Coin fee = null;
     try {
         fee = tx.getFee();
-    } catch (Exception e) {}
+    } catch (Exception e) {
+    }
 
     boolean rbf = false;
     try {
         rbf = tx.isOptInFullRBF();
-    } catch (Exception e) {}
+    } catch (Exception e) {
+    }
 
     java.util.Date updateTime = null;
     try {
         updateTime = tx.getUpdateTime();
-    } catch (Exception e) {}
+    } catch (Exception e) {
+    }
 
     String timeStr = updateTime != null ? new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(updateTime) : "n/a";
 
@@ -311,76 +320,88 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     boolean isSegWit = false;
     try {
         for (org.bitcoinj.core.TransactionOutput o : tx.getOutputs()) {
-            try {
-                org.bitcoinj.core.Address a = o.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
-                if (a != null && a.toString().startsWith("bc1")) {
-                    isSegWit = true;
-                    break;
-                }
-            } catch (Exception e) {}
+            org.bitcoinj.core.Address a = o.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
+            if (a != null && a.toString().startsWith("bc1")) {
+                isSegWit = true;
+                break;
+            }
         }
-    } catch (Exception e) {}
+    } catch (Exception e) {
+    }
 
     String status = confs <= 0 ? "PENDING" : confs < 6 ? "BUILDING" : "CONFIRMED";
 
     org.bitcoinj.core.Coin totalFrom = org.bitcoinj.core.Coin.ZERO;
-    java.util.List<String> fromLines = new java.util.ArrayList<>();
-    java.util.List<String> inDetails = new java.util.ArrayList<>();
+    java.util.List<String> fromLines = new java.util.ArrayList<String>();
+    java.util.List<String> inDetails = new java.util.ArrayList<String>();
+
     for (org.bitcoinj.core.TransactionInput in : tx.getInputs()) {
         try {
             org.bitcoinj.core.TransactionOutput c = in.getConnectedOutput();
             org.bitcoinj.core.Coin v = c != null ? c.getValue() : null;
-            if (v != null) totalFrom = totalFrom.add(v);
+            if (v != null) {
+                totalFrom = totalFrom.add(v);
+            }
             String addr = "unknown";
             try {
                 addr = c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS).toString();
-            } catch (Exception e) {}
+            } catch (Exception e) {
+            }
             fromLines.add(addr + " — " + (v != null ? v.toFriendlyString() : ""));
             inDetails.add("IN: " + in.getOutpoint().toString() + "\nSEQ: " + in.getSequenceNumber());
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
     }
 
     org.bitcoinj.core.Coin totalTo = org.bitcoinj.core.Coin.ZERO;
-    java.util.List<String> toLines = new java.util.ArrayList<>();
-    java.util.List<String> outDetails = new java.util.ArrayList<>();
+    java.util.List<String> toLines = new java.util.ArrayList<String>();
+    java.util.List<String> outDetails = new java.util.ArrayList<String>();
     String opReturnData = null;
+
     for (int i = 0; i < tx.getOutputs().size(); i++) {
         org.bitcoinj.core.TransactionOutput out = tx.getOutputs().get(i);
         try {
             org.bitcoinj.core.Coin v = out.getValue();
-            if (v != null) totalTo = totalTo.add(v);
+            if (v != null) {
+                totalTo = totalTo.add(v);
+            }
             String addr = "unknown";
             String type = "nonstandard";
             try {
                 if (out.getScriptPubKey().isOpReturn()) {
                     type = "OP_RETURN";
-                    try {
-                        opReturnData = new String(out.getScriptPubKey().getChunks().get(1).data, "UTF-8");
-                    } catch (Exception e) {}
+                    opReturnData = new String(out.getScriptPubKey().getChunks().get(1).data, "UTF-8");
                 } else {
-                    try {
-                        org.bitcoinj.core.Address a = out.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
-                        if (a != null) {
-                            addr = a.toString();
-                            if (addr.startsWith("bc1q")) type = "P2WPKH";
-                            else if (addr.startsWith("bc1p")) type = "P2TR";
-                            else if (addr.startsWith("bc1")) type = "P2WSH";
-                            else if (addr.startsWith("3")) type = "P2SH";
-                            else if (addr.startsWith("1")) type = "P2PKH";
+                    org.bitcoinj.core.Address a = out.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
+                    if (a != null) {
+                        addr = a.toString();
+                        if (addr.startsWith("bc1q")) {
+                            type = "P2WPKH";
+                        } else if (addr.startsWith("bc1p")) {
+                            type = "P2TR";
+                        } else if (addr.startsWith("bc1")) {
+                            type = "P2WSH";
+                        } else if (addr.startsWith("3")) {
+                            type = "P2SH";
+                        } else if (addr.startsWith("1")) {
+                            type = "P2PKH";
                         }
-                    } catch (Exception e) {}
+                    }
                 }
-            } catch (Exception e) {}
+            } catch (Exception e) {
+            }
             toLines.add(addr + " — " + (v != null ? v.toFriendlyString() : ""));
             outDetails.add("OUT: #" + i + " " + type + " " + (v != null ? v.toFriendlyString() : ""));
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
     }
 
     org.bitcoinj.core.Address actualReceiver = null;
     org.bitcoinj.core.Address actualSender = null;
     try {
         actualReceiver = txSent ? WalletUtils.getToAddressOfSent(tx, wallet) : WalletUtils.getWalletAddressOfReceived(tx, wallet);
-    } catch (Exception e) {}
+    } catch (Exception e) {
+    }
     try {
         org.bitcoinj.core.Coin max = org.bitcoinj.core.Coin.ZERO;
         for (org.bitcoinj.core.TransactionInput in : tx.getInputs()) {
@@ -390,12 +411,15 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
                 actualSender = c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
             }
         }
-    } catch (Exception e) {}
+    } catch (Exception e) {
+    }
 
     android.content.Context ctx = activity;
     float density = ctx.getResources().getDisplayMetrics().density;
     int pad = (int) (12 * density);
     int padTop = (int) (16 * density);
+    int iconSize = (int) (20 * density);
+
     android.widget.ScrollView scroll = new android.widget.ScrollView(ctx);
     android.widget.LinearLayout root = new android.widget.LinearLayout(ctx);
     root.setOrientation(android.widget.LinearLayout.VERTICAL);
@@ -413,7 +437,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
 
     android.widget.LinearLayout header = new android.widget.LinearLayout(ctx);
     header.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-    header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    header.setGravity(android.view.Gravity.BOTTOM);
     android.widget.TextView tvTitle = new android.widget.TextView(ctx);
     tvTitle.setText(txSent ? "Sent" : "Receive");
     tvTitle.setTextSize(22);
@@ -423,6 +447,8 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     android.widget.ImageView ivCopyTx = new android.widget.ImageView(ctx);
     ivCopyTx.setImageResource(R.drawable.ic_copy);
     ivCopyTx.setColorFilter(tvTitle.getCurrentTextColor());
+    ivCopyTx.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+    ivCopyTx.setLayoutParams(new android.widget.LinearLayout.LayoutParams(iconSize, iconSize));
     ivCopyTx.setTag((txSent ? "Sent" : "Receive") + "\n" + tx.getTxId().toString());
     ivCopyTx.setOnClickListener(copyListener);
     header.addView(ivCopyTx);
@@ -435,10 +461,11 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
 
     int iconColor = tvTitle.getCurrentTextColor();
 
+    // OVERVIEW
     String overviewTxt = "Time: " + timeStr + "\nConfirmations: " + confs + "\nBlock: " + (height > 0 ? height : "unconfirmed") + "\nStatus: " + status + "\nNet: " + (netValue != null ? netValue.toFriendlyString() : "-");
     android.widget.LinearLayout ovHead = new android.widget.LinearLayout(ctx);
     ovHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-    ovHead.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    ovHead.setGravity(android.view.Gravity.BOTTOM);
     android.widget.TextView tvOv = new android.widget.TextView(ctx);
     tvOv.setText("OVERVIEW");
     tvOv.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -448,11 +475,12 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     android.widget.ImageView ivOv = new android.widget.ImageView(ctx);
     ivOv.setImageResource(R.drawable.ic_copy);
     ivOv.setColorFilter(iconColor);
+    ivOv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+    android.widget.LinearLayout.LayoutParams lpOv = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
+    lpOv.bottomMargin = (int) (2 * density);
+    ivOv.setLayoutParams(lpOv);
     ivOv.setTag(overviewTxt);
     ivOv.setOnClickListener(copyListener);
-    android.widget.LinearLayout.LayoutParams lpOv = new android.widget.LinearLayout.LayoutParams((int) (24 * density), (int) (24 * density));
-    lpOv.topMargin = padTop;
-    ivOv.setLayoutParams(lpOv);
     ovHead.addView(ivOv);
     root.addView(ovHead);
     android.widget.TextView tvOvInfo = new android.widget.TextView(ctx);
@@ -460,10 +488,11 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     tvOvInfo.setTextIsSelectable(true);
     root.addView(tvOvInfo);
 
+    // AMOUNT
     String amountTxt = "Fee: " + (fee != null ? fee.toFriendlyString() : "0 BTC") + "\nFee rate: " + (fee != null ? String.format(java.util.Locale.US, "%.1f", (double) fee.value / vsize) : "-") + " sat/vB";
     android.widget.LinearLayout amHead = new android.widget.LinearLayout(ctx);
     amHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-    amHead.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    amHead.setGravity(android.view.Gravity.BOTTOM);
     android.widget.TextView tvAm = new android.widget.TextView(ctx);
     tvAm.setText("AMOUNT");
     tvAm.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -473,11 +502,12 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     android.widget.ImageView ivAm = new android.widget.ImageView(ctx);
     ivAm.setImageResource(R.drawable.ic_copy);
     ivAm.setColorFilter(iconColor);
+    ivAm.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+    android.widget.LinearLayout.LayoutParams lpAm = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
+    lpAm.bottomMargin = (int) (2 * density);
+    ivAm.setLayoutParams(lpAm);
     ivAm.setTag(amountTxt);
     ivAm.setOnClickListener(copyListener);
-    android.widget.LinearLayout.LayoutParams lpAm = new android.widget.LinearLayout.LayoutParams((int) (24 * density), (int) (24 * density));
-    lpAm.topMargin = padTop;
-    ivAm.setLayoutParams(lpAm);
     amHead.addView(ivAm);
     root.addView(amHead);
     android.widget.TextView tvAmInfo = new android.widget.TextView(ctx);
@@ -485,16 +515,18 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     tvAmInfo.setTextIsSelectable(true);
     root.addView(tvAmInfo);
 
-    StringBuilder techSb = new StringBuilder();
-    techSb.append("Version: ").append(version).append(" | Locktime: ").append(locktime).append("\n");
-    techSb.append("Size: ").append(tx.getMessageSize()).append(" B | vSize: ").append(vsize).append(" vB | Weight: ").append(tx.getWeight()).append("\n");
-    techSb.append("Inputs: ").append(tx.getInputs().size()).append(" | Outputs: ").append(tx.getOutputs().size()).append("\n");
-    techSb.append("RBF: ").append(rbf ? "Yes" : "No").append(" | SegWit: ").append(isSegWit ? "Yes" : "No").append(" | Coinbase: ").append(isCoinbase ? "Yes" : "No");
-    if (opReturnData != null) techSb.append("\nOP_RETURN: ").append(opReturnData);
-    String techTxt = techSb.toString();
+    // TECHNICAL
+    StringBuilder tech = new StringBuilder();
+    tech.append("Version: ").append(version).append(" | Locktime: ").append(locktime).append("\n");
+    tech.append("Size: ").append(tx.getMessageSize()).append(" B | vSize: ").append(vsize).append(" vB | Weight: ").append(tx.getWeight()).append("\n");
+    tech.append("Inputs: ").append(tx.getInputs().size()).append(" | Outputs: ").append(tx.getOutputs().size()).append("\n");
+    tech.append("RBF: ").append(rbf ? "Yes" : "No").append(" | SegWit: ").append(isSegWit ? "Yes" : "No").append(" | Coinbase: ").append(isCoinbase ? "Yes" : "No");
+    if (opReturnData != null) {
+        tech.append("\nOP_RETURN: ").append(opReturnData);
+    }
     android.widget.LinearLayout teHead = new android.widget.LinearLayout(ctx);
     teHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-    teHead.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    teHead.setGravity(android.view.Gravity.BOTTOM);
     android.widget.TextView tvTe = new android.widget.TextView(ctx);
     tvTe.setText("TECHNICAL");
     tvTe.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -504,24 +536,28 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     android.widget.ImageView ivTe = new android.widget.ImageView(ctx);
     ivTe.setImageResource(R.drawable.ic_copy);
     ivTe.setColorFilter(iconColor);
-    ivTe.setTag(techTxt);
-    ivTe.setOnClickListener(copyListener);
-    android.widget.LinearLayout.LayoutParams lpTe = new android.widget.LinearLayout.LayoutParams((int) (24 * density), (int) (24 * density));
-    lpTe.topMargin = padTop;
+    ivTe.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+    android.widget.LinearLayout.LayoutParams lpTe = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
+    lpTe.bottomMargin = (int) (2 * density);
     ivTe.setLayoutParams(lpTe);
+    ivTe.setTag(tech.toString());
+    ivTe.setOnClickListener(copyListener);
     teHead.addView(ivTe);
     root.addView(teHead);
     android.widget.TextView tvTeInfo = new android.widget.TextView(ctx);
-    tvTeInfo.setText(techTxt);
+    tvTeInfo.setText(tech.toString());
     tvTeInfo.setTextIsSelectable(true);
     root.addView(tvTeInfo);
 
-    StringBuilder fromAllSb = new StringBuilder();
-    for (String s : fromLines) fromAllSb.append(s).append("\n");
-    String fromTxt = "Total: " + totalFrom.toFriendlyString() + " from " + fromLines.size() + "\n" + fromAllSb.toString().trim();
+    // FROM
+    StringBuilder fromAll = new StringBuilder();
+    for (String s : fromLines) {
+        fromAll.append(s).append("\n");
+    }
+    String fromTxt = "Total: " + totalFrom.toFriendlyString() + " from " + fromLines.size() + "\n" + fromAll.toString().trim();
     android.widget.LinearLayout frHead = new android.widget.LinearLayout(ctx);
     frHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-    frHead.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    frHead.setGravity(android.view.Gravity.BOTTOM);
     android.widget.TextView tvFr = new android.widget.TextView(ctx);
     tvFr.setText("FROM");
     tvFr.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -531,11 +567,12 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     android.widget.ImageView ivFr = new android.widget.ImageView(ctx);
     ivFr.setImageResource(R.drawable.ic_copy);
     ivFr.setColorFilter(iconColor);
+    ivFr.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+    android.widget.LinearLayout.LayoutParams lpFr = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
+    lpFr.bottomMargin = (int) (2 * density);
+    ivFr.setLayoutParams(lpFr);
     ivFr.setTag(fromTxt);
     ivFr.setOnClickListener(copyListener);
-    android.widget.LinearLayout.LayoutParams lpFr = new android.widget.LinearLayout.LayoutParams((int) (24 * density), (int) (24 * density));
-    lpFr.topMargin = padTop;
-    ivFr.setLayoutParams(lpFr);
     frHead.addView(ivFr);
     root.addView(frHead);
     android.widget.TextView tvFrTot = new android.widget.TextView(ctx);
@@ -544,7 +581,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     for (String l : fromLines) {
         android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
         row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        row.setGravity(android.view.Gravity.TOP);
+        row.setGravity(android.view.Gravity.BOTTOM);
         android.widget.TextView tv = new android.widget.TextView(ctx);
         tv.setText(l);
         tv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
@@ -552,22 +589,24 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         android.widget.ImageView iv = new android.widget.ImageView(ctx);
         iv.setImageResource(R.drawable.ic_copy);
         iv.setColorFilter(iconColor);
+        iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        iv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(iconSize, iconSize));
         iv.setTag(l);
         iv.setOnClickListener(copyListener);
-        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams((int) (24 * density), (int) (24 * density));
-        lp.topMargin = (int) (2 * density);
-        iv.setLayoutParams(lp);
         row.addView(tv);
         row.addView(iv);
         root.addView(row);
     }
 
-    StringBuilder toAllSb = new StringBuilder();
-    for (String s : toLines) toAllSb.append(s).append("\n");
-    String toTxt = "Total: " + totalTo.toFriendlyString() + " to " + toLines.size() + "\n" + toAllSb.toString().trim();
+    // TO
+    StringBuilder toAll = new StringBuilder();
+    for (String s : toLines) {
+        toAll.append(s).append("\n");
+    }
+    String toTxt = "Total: " + totalTo.toFriendlyString() + " to " + toLines.size() + "\n" + toAll.toString().trim();
     android.widget.LinearLayout toHead = new android.widget.LinearLayout(ctx);
     toHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-    toHead.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    toHead.setGravity(android.view.Gravity.BOTTOM);
     android.widget.TextView tvTo = new android.widget.TextView(ctx);
     tvTo.setText("TO");
     tvTo.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -577,11 +616,12 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     android.widget.ImageView ivTo = new android.widget.ImageView(ctx);
     ivTo.setImageResource(R.drawable.ic_copy);
     ivTo.setColorFilter(iconColor);
+    ivTo.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+    android.widget.LinearLayout.LayoutParams lpTo = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
+    lpTo.bottomMargin = (int) (2 * density);
+    ivTo.setLayoutParams(lpTo);
     ivTo.setTag(toTxt);
     ivTo.setOnClickListener(copyListener);
-    android.widget.LinearLayout.LayoutParams lpTo = new android.widget.LinearLayout.LayoutParams((int) (24 * density), (int) (24 * density));
-    lpTo.topMargin = padTop;
-    ivTo.setLayoutParams(lpTo);
     toHead.addView(ivTo);
     root.addView(toHead);
     android.widget.TextView tvToTot = new android.widget.TextView(ctx);
@@ -590,7 +630,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     for (String l : toLines) {
         android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
         row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        row.setGravity(android.view.Gravity.TOP);
+        row.setGravity(android.view.Gravity.BOTTOM);
         android.widget.TextView tv = new android.widget.TextView(ctx);
         tv.setText(l);
         tv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
@@ -598,23 +638,26 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         android.widget.ImageView iv = new android.widget.ImageView(ctx);
         iv.setImageResource(R.drawable.ic_copy);
         iv.setColorFilter(iconColor);
+        iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        iv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(iconSize, iconSize));
         iv.setTag(l);
         iv.setOnClickListener(copyListener);
-        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams((int) (24 * density), (int) (24 * density));
-        lp.topMargin = (int) (2 * density);
-        iv.setLayoutParams(lp);
         row.addView(tv);
         row.addView(iv);
         root.addView(row);
     }
 
-    StringBuilder detSb = new StringBuilder();
-    for (String s : inDetails) detSb.append(s).append("\n");
-    for (String s : outDetails) detSb.append(s).append("\n");
-    String detailsTxt = detSb.toString().trim();
+    // DETAILS
+    StringBuilder det = new StringBuilder();
+    for (String s : inDetails) {
+        det.append(s).append("\n");
+    }
+    for (String s : outDetails) {
+        det.append(s).append("\n");
+    }
     android.widget.LinearLayout deHead = new android.widget.LinearLayout(ctx);
     deHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-    deHead.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    deHead.setGravity(android.view.Gravity.BOTTOM);
     android.widget.TextView tvDe = new android.widget.TextView(ctx);
     tvDe.setText("DETAILS");
     tvDe.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -624,11 +667,12 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     android.widget.ImageView ivDe = new android.widget.ImageView(ctx);
     ivDe.setImageResource(R.drawable.ic_copy);
     ivDe.setColorFilter(iconColor);
-    ivDe.setTag(detailsTxt);
-    ivDe.setOnClickListener(copyListener);
-    android.widget.LinearLayout.LayoutParams lpDe = new android.widget.LinearLayout.LayoutParams((int) (24 * density), (int) (24 * density));
-    lpDe.topMargin = padTop;
+    ivDe.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+    android.widget.LinearLayout.LayoutParams lpDe = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
+    lpDe.bottomMargin = (int) (2 * density);
     ivDe.setLayoutParams(lpDe);
+    ivDe.setTag(det.toString().trim());
+    ivDe.setOnClickListener(copyListener);
     deHead.addView(ivDe);
     root.addView(deHead);
     for (String s : inDetails) {
@@ -646,10 +690,11 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         root.addView(d);
     }
 
+    // WALLET
     String walletTxt = "Actual Sender: " + (actualSender != null ? actualSender : "unknown") + "\nActual Receiver: " + (actualReceiver != null ? actualReceiver : "unknown");
     android.widget.LinearLayout waHead = new android.widget.LinearLayout(ctx);
     waHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-    waHead.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    waHead.setGravity(android.view.Gravity.BOTTOM);
     android.widget.TextView tvWa = new android.widget.TextView(ctx);
     tvWa.setText("WALLET");
     tvWa.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -659,11 +704,12 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     android.widget.ImageView ivWa = new android.widget.ImageView(ctx);
     ivWa.setImageResource(R.drawable.ic_copy);
     ivWa.setColorFilter(iconColor);
+    ivWa.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+    android.widget.LinearLayout.LayoutParams lpWa = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
+    lpWa.bottomMargin = (int) (2 * density);
+    ivWa.setLayoutParams(lpWa);
     ivWa.setTag(walletTxt);
     ivWa.setOnClickListener(copyListener);
-    android.widget.LinearLayout.LayoutParams lpWa = new android.widget.LinearLayout.LayoutParams((int) (24 * density), (int) (24 * density));
-    lpWa.topMargin = padTop;
-    ivWa.setLayoutParams(lpWa);
     waHead.addView(ivWa);
     root.addView(waHead);
     android.widget.TextView tvAS = new android.widget.TextView(ctx);
@@ -677,27 +723,23 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
 
     final StringBuilder plain = new StringBuilder();
     plain.append(txSent ? "Sent" : "Receive").append("\n").append(tx.getTxId()).append("\n\n");
-    plain.append(overviewTxt).append("\n\n").append(amountTxt).append("\n\n").append(techTxt).append("\n\n");
-    plain.append(fromTxt).append("\n\n").append(toTxt).append("\n\n").append(detailsTxt).append("\n\n").append(walletTxt);
+    plain.append(overviewTxt).append("\n\n").append(amountTxt).append("\n\n").append(tech).append("\n\n");
+    plain.append(fromTxt).append("\n\n").append(toTxt).append("\n\n").append(det).append("\n\n").append(walletTxt);
 
-    new android.app.AlertDialog.Builder(activity)
-        .setView(scroll)
-        .setPositiveButton("OK", null)
-        .setNeutralButton("COPY ALL", new android.content.DialogInterface.OnClickListener() {
-            public void onClick(android.content.DialogInterface d, int w) {
-                android.content.ClipboardManager cm = (android.content.ClipboardManager) ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-                cm.setPrimaryClip(android.content.ClipData.newPlainText("tx", plain.toString()));
-                android.widget.Toast.makeText(ctx, "Copied all", android.widget.Toast.LENGTH_SHORT).show();
+    new android.app.AlertDialog.Builder(activity).setView(scroll).setPositiveButton("OK", null).setNeutralButton("COPY ALL", new android.content.DialogInterface.OnClickListener() {
+        public void onClick(android.content.DialogInterface d, int w) {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("tx", plain.toString()));
+            android.widget.Toast.makeText(ctx, "Copied all", android.widget.Toast.LENGTH_SHORT).show();
+        }
+    }).setNegativeButton("EXPLORER", new android.content.DialogInterface.OnClickListener() {
+        public void onClick(android.content.DialogInterface d, int w) {
+            try {
+                activity.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://mempool.space/tx/" + tx.getTxId())));
+            } catch (Exception e) {
             }
-        })
-        .setNegativeButton("EXPLORER", new android.content.DialogInterface.OnClickListener() {
-            public void onClick(android.content.DialogInterface d, int w) {
-                try {
-                    activity.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://mempool.space/tx/" + tx.getTxId())));
-                } catch (Exception e) {}
-            }
-        })
-        .show();
+        }
+    }).show();
 }
     
 //end show transaction
