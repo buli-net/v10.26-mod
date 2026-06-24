@@ -259,104 +259,8 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     }
 
         //add show transaction
-
-/*public void showTransactionDetails(final Sha256Hash transactionId) {
-    viewModel.selectedTransaction.setValue(transactionId);
-    final Wallet wallet = viewModel.wallet.getValue();
-    final Transaction tx = wallet.getTransaction(transactionId);
-    if (tx == null) return;
-
-    boolean txSent = false;
-    try { txSent = wallet != null && tx.getValue(wallet).signum() < 0; } catch(Exception e) {}
-
-    int confs = 0; try { confs = tx.getConfidence().getDepthInBlocks(); } catch(Exception e){}
-    int height = 0; try { height = tx.getConfidence().getAppearedAtChainHeight(); } catch(Exception e){}
-    org.bitcoinj.core.Coin fee = null; try { fee = tx.getFee(); } catch(Exception e){}
-    boolean rbf = false; try { rbf = tx.isOptInFullRBF(); } catch(Exception e){}
-
-    java.util.Date updateTime = null; try { updateTime = tx.getUpdateTime(); } catch(Exception e){}
-    String timeStr = updateTime != null ? new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(updateTime) : "n/a";
-
-    boolean isSegWit = false;
-    try {
-        for (org.bitcoinj.core.TransactionInput in : tx.getInputs()) {
-            org.bitcoinj.core.TransactionOutput conn = in.getConnectedOutput();
-            if (conn != null) {
-                org.bitcoinj.core.Address a = conn.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
-                if (a != null && a.toString().startsWith("bc1")) { isSegWit = true; break; }
-            }
-        }
-    } catch(Exception e){}
-
-    String status = confs <= 0 ? "PENDING" : confs < 6 ? "BUILDING" : "CONFIRMED";
-    String statusColor = status.equals("PENDING") ? "#FFA726" : status.equals("BUILDING") ? "#29B6F6" : "#66BB6A";
-
-    StringBuilder html = new StringBuilder();
-    html.append("<big><b>").append(txSent ? "Sent" : "Received").append("</b></big><br>");
-    html.append(tx.getTxId().toString()).append("<br><br>");
-    html.append("<b>Time:</b> ").append(timeStr).append("<br>");
-    html.append("<b>Confirmations:</b> ").append(confs).append("<br>");
-    html.append("<b>Block:</b> ").append(height>0?height:"unconfirmed").append("<br><br>");
-    html.append("<b>Fee:</b> ").append(fee!=null?fee.toFriendlyString():"0 BTC").append("<br>");
-    try { int vsize=(tx.getWeight()+3)/4; if(fee!=null) html.append("<b>Fee rate:</b> ").append(String.format(java.util.Locale.US,"%.1f", (double)fee.value/vsize)).append(" sat/vB<br>"); } catch(Exception e){}
-    html.append("<b>Size:</b> ").append(tx.getMessageSize()).append(" bytes | <b>Weight:</b> ").append(tx.getWeight()).append("<br>");
-    html.append("<b>RBF:</b> ").append(rbf?"Yes":"No").append(" | <b>SegWit:</b> ").append(isSegWit?"Yes":"No").append("<br><br>");
-    html.append("<b>Status:</b> <font color='").append(statusColor).append("'>").append(status).append("</font><br><br>");
-
-    org.bitcoinj.core.Coin totalFrom = org.bitcoinj.core.Coin.ZERO;
-    java.util.List<String> fromLines = new java.util.ArrayList<>();
-    for (org.bitcoinj.core.TransactionInput in : tx.getInputs()) {
-        try { org.bitcoinj.core.TransactionOutput c = in.getConnectedOutput(); if(c!=null){ org.bitcoinj.core.Coin v=c.getValue(); if(v!=null) totalFrom=totalFrom.add(v); String addr="unknown"; try{addr=c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS).toString();}catch(Exception e){} fromLines.add(addr+" — "+(v!=null?v.toFriendlyString():"")); } } catch(Exception e){}
-    }
-    // FIX 1 & 2: FROM có Total riêng + cách dòng
-    String fromWord = fromLines.size()==1?"input":"inputs";
-    html.append("<b>FROM</b><br><br>");
-    html.append("Total: ").append(totalFrom.toFriendlyString()).append(" from ").append(fromLines.size()).append(" ").append(fromWord).append("<br><br>");
-    for(String l: fromLines) html.append(l).append("<br><br>");
-
-    org.bitcoinj.core.Coin totalTo = org.bitcoinj.core.Coin.ZERO;
-    java.util.List<String> toLines = new java.util.ArrayList<>();
-    for (org.bitcoinj.core.TransactionOutput out : tx.getOutputs()) {
-        try { org.bitcoinj.core.Coin v=out.getValue(); if(v!=null) totalTo=totalTo.add(v); String addr="unknown"; try{addr=out.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS).toString();}catch(Exception e){} toLines.add(addr+" — "+(v!=null?v.toFriendlyString():"")); } catch(Exception e){}
-    }
-    // FIX 1 & 2: TO có Total riêng + cách dòng
-    String toWord = toLines.size()==1?"output":"outputs";
-    html.append("<b>TO</b><br><br>");
-    html.append("Total: ").append(totalTo.toFriendlyString()).append(" to ").append(toLines.size()).append(" ").append(toWord).append("<br><br>");
-    for(String l: toLines) html.append(l).append("<br><br>");
-
-    org.bitcoinj.core.Address actualReceiver=null, actualSender=null;
-    try { actualReceiver = txSent ? WalletUtils.getToAddressOfSent(tx, wallet) : WalletUtils.getWalletAddressOfReceived(tx, wallet); } catch(Exception e){}
-    try { org.bitcoinj.core.Coin max=org.bitcoinj.core.Coin.ZERO; for(org.bitcoinj.core.TransactionInput in:tx.getInputs()){ org.bitcoinj.core.TransactionOutput c=in.getConnectedOutput(); if(c!=null&&c.getValue()!=null&&c.getValue().isGreaterThan(max)){max=c.getValue(); actualSender=c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);} } } catch(Exception e){}
-    html.append("<b>Actual Sender:</b><br>").append(actualSender!=null?actualSender:"unknown").append("<br>");
-    html.append("<b>Actual Receiver:</b><br>").append(actualReceiver!=null?actualReceiver:"unknown");
-
-    android.text.Spanned message = android.text.Html.fromHtml(html.toString(), android.text.Html.FROM_HTML_MODE_LEGACY);
-
-    // FIX 3: thêm nút COPY, giữ nguyên OK và EXPLORER
-    final String plainText = android.text.Html.fromHtml(html.toString()).toString();
-    
-    new android.app.AlertDialog.Builder(activity)
-            .setMessage(message)
-            .setPositiveButton("OK", null)
-            .setNeutralButton("COPY", (d,w)->{
-                try {
-                    android.content.ClipboardManager cm = (android.content.ClipboardManager) activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-                    cm.setPrimaryClip(android.content.ClipData.newPlainText("tx", plainText));
-                    android.widget.Toast.makeText(activity, "Copied", android.widget.Toast.LENGTH_SHORT).show();
-                } catch(Exception e){}
-            })
-            .setNegativeButton("EXPLORER", (d,w)->{
-                try { startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://mempool.space/tx/"+tx.getTxId()))); } catch(Exception e){}
-            })
-            .show();
-}*/
-
-
-
-        ////////////////test
-
-    public void showTransactionDetails(final Sha256Hash transactionId) {
+        
+public void showTransactionDetails(final Sha256Hash transactionId) {
     viewModel.selectedTransaction.setValue(transactionId);
     final Wallet wallet = viewModel.wallet.getValue();
     final Transaction tx = wallet.getTransaction(transactionId);
@@ -518,7 +422,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
         row.addView(tv); row.addView(iv); root.addView(row);
     }
 
-    // Actual
+    // Actual Sender
     android.widget.TextView tvAS = new android.widget.TextView(ctx); tvAS.setText("Actual Sender:"); tvAS.setTypeface(null,android.graphics.Typeface.BOLD); root.addView(tvAS);
     android.widget.LinearLayout rowAS = new android.widget.LinearLayout(ctx); rowAS.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvASv = new android.widget.TextView(ctx); tvASv.setText(actualSender!=null?actualSender.toString():"unknown"); tvASv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
@@ -526,12 +430,48 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     ivAS.setTag("Actual Sender:\n"+(actualSender!=null?actualSender:"unknown")); ivAS.setOnClickListener(copyListener);
     rowAS.addView(tvASv); rowAS.addView(ivAS); root.addView(rowAS);
 
+    // Actual Receiver
     android.widget.TextView tvAR = new android.widget.TextView(ctx); tvAR.setText("Actual Receiver:"); tvAR.setTypeface(null,android.graphics.Typeface.BOLD); root.addView(tvAR);
     android.widget.LinearLayout rowAR = new android.widget.LinearLayout(ctx); rowAR.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvARv = new android.widget.TextView(ctx); tvARv.setText(actualReceiver!=null?actualReceiver.toString():"unknown"); tvARv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
     android.widget.ImageView ivAR = new android.widget.ImageView(ctx); ivAR.setImageResource(R.drawable.ic_copy); ivAR.setColorFilter(iconColor);
-    ivAR.setTag("Actual Receiver:\n"+(actualReceiver!=null?actualReceiver:"unknown")); ivAR
+    ivAR.setTag("Actual Receiver:\n"+(actualReceiver!=null?actualReceiver:"unknown")); ivAR.setOnClickListener(copyListener);
+    rowAR.addView(tvARv); rowAR.addView(ivAR); root.addView(rowAR);
 
+    // COPY ALL text
+    StringBuilder plain = new StringBuilder();
+    plain.append(txSent?"Sent":"Receive").append("\n").append(tx.getTxId()).append("\n\n");
+    plain.append("Time: ").append(timeStr).append("\n");
+    plain.append("Confirmations: ").append(confs).append("\n");
+    plain.append("Block: ").append(height>0?height:"unconfirmed").append("\n\n");
+    plain.append("Fee: ").append(fee!=null?fee.toFriendlyString():"0 BTC").append("\n");
+    try{ int vsize=(tx.getWeight()+3)/4; if(fee!=null) plain.append("Fee rate: ").append(String.format(java.util.Locale.US,"%.1f",(double)fee.value/vsize)).append(" sat/vB\n"); }catch(Exception e){}
+    plain.append("Size: ").append(tx.getMessageSize()).append(" bytes | Weight: ").append(tx.getWeight()).append("\n");
+    plain.append("RBF: ").append(rbf?"Yes":"No").append(" | SegWit: ").append(isSegWit?"Yes":"No").append("\n");
+    plain.append("Status: ").append(status).append("\n\n");
+    plain.append("FROM\n\n").append(fromAll).append("\n");
+    plain.append("TO\n\n").append(toAll).append("\n");
+    plain.append("Actual Sender:\n").append(actualSender!=null?actualSender:"unknown").append("\n");
+    plain.append("Actual Receiver:\n").append(actualReceiver!=null?actualReceiver:"unknown");
+    final String plainAll = plain.toString();
+
+    new android.app.AlertDialog.Builder(activity)
+        .setView(scroll)
+        .setPositiveButton("OK", null)
+        .setNeutralButton("COPY ALL", new android.content.DialogInterface.OnClickListener() {
+            @Override public void onClick(android.content.DialogInterface d, int w) {
+                android.content.ClipboardManager cm = (android.content.ClipboardManager) ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("tx", plainAll));
+                android.widget.Toast.makeText(ctx, "Copied all", android.widget.Toast.LENGTH_SHORT).show();
+            }
+        })
+        .setNegativeButton("EXPLORER", new android.content.DialogInterface.OnClickListener() {
+            @Override public void onClick(android.content.DialogInterface d, int w) {
+                try { activity.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://mempool.space/tx/" + tx.getTxId()))); } catch (Exception e) {}
+            }
+        })
+        .show();
+}
 //end show transaction
         
     @Override
