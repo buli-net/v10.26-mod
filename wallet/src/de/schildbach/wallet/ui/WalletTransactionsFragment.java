@@ -401,7 +401,6 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     try { actualReceiver = txSent ? WalletUtils.getToAddressOfSent(tx, wallet) : WalletUtils.getWalletAddressOfReceived(tx, wallet); } catch(Exception e){}
     try { org.bitcoinj.core.Coin max=org.bitcoinj.core.Coin.ZERO; for(org.bitcoinj.core.TransactionInput in:tx.getInputs()){ org.bitcoinj.core.TransactionOutput c=in.getConnectedOutput(); if(c!=null&&c.getValue()!=null&&c.getValue().isGreaterThan(max)){max=c.getValue(); actualSender=c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);} } } catch(Exception e){}
 
-    // ---- CUSTOM VIEW ----
     android.content.Context ctx = activity;
     int pad = (int)(12 * ctx.getResources().getDisplayMetrics().density);
     android.widget.ScrollView scroll = new android.widget.ScrollView(ctx);
@@ -410,11 +409,13 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     root.setPadding(pad,pad,pad,pad);
     scroll.addView(root);
 
-    android.view.View.OnClickListener copyListener = v -> {
-        String txt = (String) v.getTag();
-        android.content.ClipboardManager cm = (android.content.ClipboardManager) ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-        cm.setPrimaryClip(android.content.ClipData.newPlainText("copy", txt));
-        android.widget.Toast.makeText(ctx, "Đã copy", android.widget.Toast.LENGTH_SHORT).show();
+    android.view.View.OnClickListener copyListener = new android.view.View.OnClickListener() {
+        @Override public void onClick(android.view.View v) {
+            String txt = (String) v.getTag();
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("copy", txt));
+            android.widget.Toast.makeText(ctx, "Đã copy", android.widget.Toast.LENGTH_SHORT).show();
+        }
     };
 
     android.widget.TextView tvTitle = new android.widget.TextView(ctx);
@@ -426,9 +427,9 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     rowHash.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvHash = new android.widget.TextView(ctx);
     tvHash.setText(tx.getTxId().toString()); tvHash.setTextIsSelectable(true);
-    tvHash.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
+    tvHash.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
     android.widget.ImageView ivHash = new android.widget.ImageView(ctx);
-    ivHash.setImageResource(android.R.drawable.ic_menu_copy); ivHash.setPadding(pad,0,0,0);
+    ivHash.setImageResource(android.R.drawable.ic_menu_edit); ivHash.setPadding(pad,0,0,0);
     ivHash.setTag(tx.getTxId().toString()); ivHash.setOnClickListener(copyListener);
     rowHash.addView(tvHash); rowHash.addView(ivHash);
     root.addView(rowHash);
@@ -453,20 +454,19 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     android.widget.TextView tvSenderLabel = new android.widget.TextView(ctx); tvSenderLabel.setText("Actual Sender:"); tvSenderLabel.setTypeface(null, android.graphics.Typeface.BOLD);
     root.addView(tvSenderLabel);
     android.widget.LinearLayout rowSender = new android.widget.LinearLayout(ctx); rowSender.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-    android.widget.TextView tvSender = new android.widget.TextView(ctx); tvSender.setText(actualSender!=null?actualSender.toString():"unknown"); tvSender.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
-    android.widget.ImageView ivSender = new android.widget.ImageView(ctx); ivSender.setImageResource(android.R.drawable.ic_menu_copy); ivSender.setPadding(pad,0,0,0);
+    android.widget.TextView tvSender = new android.widget.TextView(ctx); tvSender.setText(actualSender!=null?actualSender.toString():"unknown"); tvSender.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,1f));
+    android.widget.ImageView ivSender = new android.widget.ImageView(ctx); ivSender.setImageResource(android.R.drawable.ic_menu_edit); ivSender.setPadding(pad,0,0,0);
     ivSender.setTag(actualSender!=null?actualSender.toString():""); ivSender.setOnClickListener(copyListener);
     rowSender.addView(tvSender); rowSender.addView(ivSender); root.addView(rowSender);
 
     android.widget.TextView tvRecLabel = new android.widget.TextView(ctx); tvRecLabel.setText("Actual Receiver:"); tvRecLabel.setTypeface(null, android.graphics.Typeface.BOLD);
     root.addView(tvRecLabel);
     android.widget.LinearLayout rowRec = new android.widget.LinearLayout(ctx); rowRec.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-    android.widget.TextView tvRec = new android.widget.TextView(ctx); tvRec.setText(actualReceiver!=null?actualReceiver.toString():"unknown"); tvRec.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
-    android.widget.ImageView ivRec = new android.widget.ImageView(ctx); ivRec.setImageResource(android.R.drawable.ic_menu_copy); ivRec.setPadding(pad,0,0,0);
+    android.widget.TextView tvRec = new android.widget.TextView(ctx); tvRec.setText(actualReceiver!=null?actualReceiver.toString():"unknown"); tvRec.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,1f));
+    android.widget.ImageView ivRec = new android.widget.ImageView(ctx); ivRec.setImageResource(android.R.drawable.ic_menu_edit); ivRec.setPadding(pad,0,0,0);
     ivRec.setTag(actualReceiver!=null?actualReceiver.toString():""); ivRec.setOnClickListener(copyListener);
     rowRec.addView(tvRec); rowRec.addView(ivRec); root.addView(rowRec);
 
-    // ---- plain text giữ nguyên bố cục cho COPY ALL ----
     StringBuilder plain = new StringBuilder();
     plain.append(txSent ? "Sent" : "Received").append("\n");
     plain.append(tx.getTxId().toString()).append("\n\n");
@@ -491,16 +491,21 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     new android.app.AlertDialog.Builder(activity)
         .setView(scroll)
         .setPositiveButton("OK", null)
-        .setNeutralButton("COPY ALL", (d,w)->{
-            android.content.ClipboardManager cm = (android.content.ClipboardManager) ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-            cm.setPrimaryClip(android.content.ClipData.newPlainText("tx", plainAll));
-            android.widget.Toast.makeText(ctx, "Copied all", android.widget.Toast.LENGTH_SHORT).show();
+        .setNeutralButton("COPY ALL", new android.content.DialogInterface.OnClickListener() {
+            @Override public void onClick(android.content.DialogInterface d, int w) {
+                android.content.ClipboardManager cm = (android.content.ClipboardManager) ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("tx", plainAll));
+                android.widget.Toast.makeText(ctx, "Copied all", android.widget.Toast.LENGTH_SHORT).show();
+            }
         })
-        .setNegativeButton("EXPLORER", (d,w)->{
-            try { activity.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://mempool.space/tx/"+tx.getTxId()))); } catch(Exception e){}
+        .setNegativeButton("EXPLORER", new android.content.DialogInterface.OnClickListener() {
+            @Override public void onClick(android.content.DialogInterface d, int w) {
+                try { activity.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://mempool.space/tx/"+tx.getTxId()))); } catch(Exception e){}
+            }
         })
         .show();
 }
+
 //end show transaction
         
     @Override
