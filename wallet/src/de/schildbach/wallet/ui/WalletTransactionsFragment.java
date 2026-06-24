@@ -259,7 +259,6 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     }
 
         //add show transaction
-        
 public void showTransactionDetails(final Sha256Hash transactionId) {
     viewModel.selectedTransaction.setValue(transactionId);
     final Wallet wallet = viewModel.wallet.getValue();
@@ -283,7 +282,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     long version = tx.getVersion();
     long locktime = tx.getLockTime();
 
-    // detect SegWit by bc1 address (API cũ không có hasWitness)
     boolean isSegWit = false;
     try {
         for (org.bitcoinj.core.TransactionOutput o : tx.getOutputs()) {
@@ -297,7 +295,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     String status = confs<=0?"PENDING":confs<6?"BUILDING":"CONFIRMED";
     String statusColor = status.equals("PENDING")?"#FFA726":status.equals("BUILDING")?"#29B6F6":"#66BB6A";
 
-    // FROM
     org.bitcoinj.core.Coin totalFrom = org.bitcoinj.core.Coin.ZERO;
     java.util.List<String> fromLines = new java.util.ArrayList<>();
     java.util.List<String> inDetails = new java.util.ArrayList<>();
@@ -313,7 +310,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         }catch(Exception e){}
     }
 
-    // TO
     org.bitcoinj.core.Coin totalTo = org.bitcoinj.core.Coin.ZERO;
     java.util.List<String> toLines = new java.util.ArrayList<>();
     java.util.List<String> outDetails = new java.util.ArrayList<>();
@@ -369,7 +365,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     root.setPadding(pad,pad,pad,pad);
     scroll.addView(root);
 
-    android.view.View.OnClickListener copyListener = new android.view.View.OnClickListener(){
+    final android.view.View.OnClickListener copyListener = new android.view.View.OnClickListener(){
         public void onClick(android.view.View v){
             String txt = (String)v.getTag();
             android.content.ClipboardManager cm = (android.content.ClipboardManager)ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
@@ -400,175 +396,186 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     tvHash.setTextIsSelectable(true);
     root.addView(tvHash);
 
-    // OVERVIEW
-    android.widget.TextView tvOver = new android.widget.TextView(ctx);
-    tvOver.setText("\nOVERVIEW");
-    tvOver.setTypeface(null, android.graphics.Typeface.BOLD);
-    root.addView(tvOver);
-    StringBuilder info = new StringBuilder();
-    info.append("<b>Time:</b> ").append(timeStr).append("<br>");
-    info.append("<b>Confirmations:</b> ").append(confs).append("<br>");
-    info.append("<b>Block:</b> ").append(height>0?height:"unconfirmed").append("<br>");
-    info.append("<b>Status:</b> <font color='").append(statusColor).append("'>").append(status).append("</font><br>");
-    info.append("<b>Net:</b> ").append(netValue!=null?netValue.toFriendlyString():"-").append("<br>");
-    android.widget.TextView tvInfo = new android.widget.TextView(ctx);
-    tvInfo.setText(android.text.Html.fromHtml(info.toString(), android.text.Html.FROM_HTML_MODE_LEGACY));
-    root.addView(tvInfo);
-
-    // AMOUNT
-    android.widget.TextView tvAmt = new android.widget.TextView(ctx);
-    tvAmt.setText("\nAMOUNT");
-    tvAmt.setTypeface(null, android.graphics.Typeface.BOLD);
-    root.addView(tvAmt);
-    StringBuilder amt = new StringBuilder();
-    amt.append("<b>Fee:</b> ").append(fee!=null?fee.toFriendlyString():"0 BTC").append("<br>");
-    if(fee!=null) amt.append("<b>Fee rate:</b> ").append(String.format(java.util.Locale.US,"%.1f",(double)fee.value/vsize)).append(" sat/vB<br>");
-    android.widget.TextView tvAmtInfo = new android.widget.TextView(ctx);
-    tvAmtInfo.setText(android.text.Html.fromHtml(amt.toString(), android.text.Html.FROM_HTML_MODE_LEGACY));
-    root.addView(tvAmtInfo);
-
-    // TECHNICAL
-    android.widget.TextView tvTech = new android.widget.TextView(ctx);
-    tvTech.setText("\nTECHNICAL");
-    tvTech.setTypeface(null, android.graphics.Typeface.BOLD);
-    root.addView(tvTech);
-    StringBuilder tech = new StringBuilder();
-    tech.append("<b>Version:</b> ").append(version).append(" | <b>Locktime:</b> ").append(locktime).append("<br>");
-    tech.append("<b>Size:</b> ").append(tx.getMessageSize()).append(" B | <b>vSize:</b> ").append(vsize).append(" vB | <b>Weight:</b> ").append(tx.getWeight()).append("<br>");
-    tech.append("<b>Inputs:</b> ").append(tx.getInputs().size()).append(" | <b>Outputs:</b> ").append(tx.getOutputs().size()).append("<br>");
-    tech.append("<b>RBF:</b> ").append(rbf?"Yes":"No").append(" | <b>SegWit:</b> ").append(isSegWit?"Yes":"No").append(" | <b>Coinbase:</b> ").append(isCoinbase?"Yes":"No").append("<br>");
-    if(opReturnData!=null) tech.append("<b>OP_RETURN:</b> ").append(opReturnData).append("<br>");
-    android.widget.TextView tvTechInfo = new android.widget.TextView(ctx);
-    tvTechInfo.setText(android.text.Html.fromHtml(tech.toString(), android.text.Html.FROM_HTML_MODE_LEGACY));
-    root.addView(tvTechInfo);
-
     int iconColor = tvTitle.getCurrentTextColor();
 
+    // OVERVIEW
+    String overviewTxt = "Time: "+timeStr+"\nConfirmations: "+confs+"\nBlock: "+(height>0?height:"unconfirmed")+"\nStatus: "+status+"\nNet: "+(netValue!=null?netValue.toFriendlyString():"-");
+    android.widget.LinearLayout ovHead = new android.widget.LinearLayout(ctx);
+    ovHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    android.widget.TextView tvOv = new android.widget.TextView(ctx);
+    tvOv.setText("\nOVERVIEW"); tvOv.setTypeface(null, android.graphics.Typeface.BOLD);
+    tvOv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+    ovHead.addView(tvOv);
+    android.widget.ImageView ivOv = new android.widget.ImageView(ctx);
+    ivOv.setImageResource(R.drawable.ic_copy); ivOv.setColorFilter(iconColor);
+    ivOv.setTag(overviewTxt); ivOv.setOnClickListener(copyListener);
+    ovHead.addView(ivOv); root.addView(ovHead);
+    android.widget.TextView tvOvInfo = new android.widget.TextView(ctx);
+    tvOvInfo.setText(overviewTxt); root.addView(tvOvInfo);
+
+    // AMOUNT
+    String amountTxt = "Fee: "+(fee!=null?fee.toFriendlyString():"0 BTC")+"\nFee rate: "+(fee!=null?String.format(java.util.Locale.US,"%.1f",(double)fee.value/vsize):"-")+" sat/vB";
+    android.widget.LinearLayout amHead = new android.widget.LinearLayout(ctx);
+    amHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    android.widget.TextView tvAm = new android.widget.TextView(ctx);
+    tvAm.setText("\nAMOUNT"); tvAm.setTypeface(null, android.graphics.Typeface.BOLD);
+    tvAm.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+    amHead.addView(tvAm);
+    android.widget.ImageView ivAm = new android.widget.ImageView(ctx);
+    ivAm.setImageResource(R.drawable.ic_copy); ivAm.setColorFilter(iconColor);
+    ivAm.setTag(amountTxt); ivAm.setOnClickListener(copyListener);
+    amHead.addView(ivAm); root.addView(amHead);
+    android.widget.TextView tvAmInfo = new android.widget.TextView(ctx);
+    tvAmInfo.setText(amountTxt); root.addView(tvAmInfo);
+
+    // TECHNICAL
+    StringBuilder techSb = new StringBuilder();
+    techSb.append("Version: ").append(version).append(" | Locktime: ").append(locktime).append("\n");
+    techSb.append("Size: ").append(tx.getMessageSize()).append(" B | vSize: ").append(vsize).append(" vB | Weight: ").append(tx.getWeight()).append("\n");
+    techSb.append("Inputs: ").append(tx.getInputs().size()).append(" | Outputs: ").append(tx.getOutputs().size()).append("\n");
+    techSb.append("RBF: ").append(rbf?"Yes":"No").append(" | SegWit: ").append(isSegWit?"Yes":"No").append(" | Coinbase: ").append(isCoinbase?"Yes":"No");
+    if(opReturnData!=null) techSb.append("\nOP_RETURN: ").append(opReturnData);
+    String techTxt = techSb.toString();
+    android.widget.LinearLayout teHead = new android.widget.LinearLayout(ctx);
+    teHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    android.widget.TextView tvTe = new android.widget.TextView(ctx);
+    tvTe.setText("\nTECHNICAL"); tvTe.setTypeface(null, android.graphics.Typeface.BOLD);
+    tvTe.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+    teHead.addView(tvTe);
+    android.widget.ImageView ivTe = new android.widget.ImageView(ctx);
+    ivTe.setImageResource(R.drawable.ic_copy); ivTe.setColorFilter(iconColor);
+    ivTe.setTag(techTxt); ivTe.setOnClickListener(copyListener);
+    teHead.addView(ivTe); root.addView(teHead);
+    android.widget.TextView tvTeInfo = new android.widget.TextView(ctx);
+    tvTeInfo.setText(techTxt); root.addView(tvTeInfo);
+
     // FROM
-    android.widget.TextView tvFromH = new android.widget.TextView(ctx);
-    tvFromH.setText("\nFROM");
-    tvFromH.setTypeface(null, android.graphics.Typeface.BOLD);
-    root.addView(tvFromH);
-    android.widget.LinearLayout fromHead = new android.widget.LinearLayout(ctx);
-    fromHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-    android.widget.TextView tvFromTot = new android.widget.TextView(ctx);
-    tvFromTot.setText("Total: " + totalFrom.toFriendlyString() + " from " + fromLines.size());
-    tvFromTot.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
-    fromHead.addView(tvFromTot);
-    android.widget.ImageView ivFromAll = new android.widget.ImageView(ctx);
-    ivFromAll.setImageResource(R.drawable.ic_copy);
-    ivFromAll.setColorFilter(iconColor);
-    StringBuilder fromAll = new StringBuilder(); for(String s:fromLines) fromAll.append(s).append("\n");
-    ivFromAll.setTag("FROM\n" + fromAll.toString().trim());
-    ivFromAll.setOnClickListener(copyListener);
-    fromHead.addView(ivFromAll);
-    root.addView(fromHead);
+    android.widget.LinearLayout frHead = new android.widget.LinearLayout(ctx);
+    frHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    android.widget.TextView tvFr = new android.widget.TextView(ctx);
+    tvFr.setText("\nFROM"); tvFr.setTypeface(null, android.graphics.Typeface.BOLD);
+    tvFr.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+    frHead.addView(tvFr);
+    StringBuilder fromAllSb = new StringBuilder(); for(String s:fromLines) fromAllSb.append(s).append("\n");
+    String fromAllTxt = "Total: "+totalFrom.toFriendlyString()+" from "+fromLines.size()+"\n"+fromAllSb.toString().trim();
+    android.widget.ImageView ivFr = new android.widget.ImageView(ctx);
+    ivFr.setImageResource(R.drawable.ic_copy); ivFr.setColorFilter(iconColor);
+    ivFr.setTag(fromAllTxt); ivFr.setOnClickListener(copyListener);
+    frHead.addView(ivFr); root.addView(frHead);
+    android.widget.TextView tvFrTot = new android.widget.TextView(ctx);
+    tvFrTot.setText("Total: " + totalFrom.toFriendlyString() + " from " + fromLines.size());
+    root.addView(tvFrTot);
     for(String l: fromLines){
         android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
         row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         android.widget.TextView tv = new android.widget.TextView(ctx);
-        tv.setText(l);
-        tv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
+        tv.setText(l); tv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
+        tv.setTextIsSelectable(true);
         android.widget.ImageView iv = new android.widget.ImageView(ctx);
-        iv.setImageResource(R.drawable.ic_copy);
-        iv.setColorFilter(iconColor);
-        iv.setTag(l);
-        iv.setOnClickListener(copyListener);
-        row.addView(tv); row.addView(iv);
-        root.addView(row);
+        iv.setImageResource(R.drawable.ic_copy); iv.setColorFilter(iconColor);
+        iv.setTag(l); iv.setOnClickListener(copyListener);
+        row.addView(tv); row.addView(iv); root.addView(row);
     }
 
     // TO
-    android.widget.TextView tvToH = new android.widget.TextView(ctx);
-    tvToH.setText("\nTO");
-    tvToH.setTypeface(null, android.graphics.Typeface.BOLD);
-    root.addView(tvToH);
     android.widget.LinearLayout toHead = new android.widget.LinearLayout(ctx);
     toHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    android.widget.TextView tvTo = new android.widget.TextView(ctx);
+    tvTo.setText("\nTO"); tvTo.setTypeface(null, android.graphics.Typeface.BOLD);
+    tvTo.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+    toHead.addView(tvTo);
+    StringBuilder toAllSb = new StringBuilder(); for(String s:toLines) toAllSb.append(s).append("\n");
+    String toAllTxt = "Total: "+totalTo.toFriendlyString()+" to "+toLines.size()+"\n"+toAllSb.toString().trim();
+    android.widget.ImageView ivTo = new android.widget.ImageView(ctx);
+    ivTo.setImageResource(R.drawable.ic_copy); ivTo.setColorFilter(iconColor);
+    ivTo.setTag(toAllTxt); ivTo.setOnClickListener(copyListener);
+    toHead.addView(ivTo); root.addView(toHead);
     android.widget.TextView tvToTot = new android.widget.TextView(ctx);
     tvToTot.setText("Total: " + totalTo.toFriendlyString() + " to " + toLines.size());
-    tvToTot.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
-    toHead.addView(tvToTot);
-    android.widget.ImageView ivToAll = new android.widget.ImageView(ctx);
-    ivToAll.setImageResource(R.drawable.ic_copy);
-    ivToAll.setColorFilter(iconColor);
-    StringBuilder toAll = new StringBuilder(); for(String s:toLines) toAll.append(s).append("\n");
-    ivToAll.setTag("TO\n" + toAll.toString().trim());
-    ivToAll.setOnClickListener(copyListener);
-    toHead.addView(ivToAll);
-    root.addView(toHead);
+    root.addView(tvToTot);
     for(String l: toLines){
         android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
         row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         android.widget.TextView tv = new android.widget.TextView(ctx);
-        tv.setText(l);
-        tv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
+        tv.setText(l); tv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
+        tv.setTextIsSelectable(true);
         android.widget.ImageView iv = new android.widget.ImageView(ctx);
-        iv.setImageResource(R.drawable.ic_copy);
-        iv.setColorFilter(iconColor);
-        iv.setTag(l);
-        iv.setOnClickListener(copyListener);
-        row.addView(tv); row.addView(iv);
-        root.addView(row);
+        iv.setImageResource(R.drawable.ic_copy); iv.setColorFilter(iconColor);
+        iv.setTag(l); iv.setOnClickListener(copyListener);
+        row.addView(tv); row.addView(iv); root.addView(row);
     }
 
     // DETAILS
-    android.widget.TextView tvDet = new android.widget.TextView(ctx);
-    tvDet.setText("\nDETAILS");
-    tvDet.setTypeface(null, android.graphics.Typeface.BOLD);
-    root.addView(tvDet);
+    StringBuilder detSb = new StringBuilder();
+    for(String s: inDetails) detSb.append("IN: ").append(s).append("\n");
+    for(String s: outDetails) detSb.append("OUT: ").append(s).append("\n");
+    String detailsTxt = detSb.toString().trim();
+    android.widget.LinearLayout deHead = new android.widget.LinearLayout(ctx);
+    deHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    android.widget.TextView tvDe = new android.widget.TextView(ctx);
+    tvDe.setText("\nDETAILS"); tvDe.setTypeface(null, android.graphics.Typeface.BOLD);
+    tvDe.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+    deHead.addView(tvDe);
+    android.widget.ImageView ivDe = new android.widget.ImageView(ctx);
+    ivDe.setImageResource(R.drawable.ic_copy); ivDe.setColorFilter(iconColor);
+    ivDe.setTag(detailsTxt); ivDe.setOnClickListener(copyListener);
+    deHead.addView(ivDe); root.addView(deHead);
     for(String s: inDetails){
         android.widget.TextView d = new android.widget.TextView(ctx);
         d.setText("IN: " + s);
-        d.setTextSize(12);
+        d.setTextIsSelectable(true);
+        d.setSingleLine(false);
         root.addView(d);
     }
     for(String s: outDetails){
         android.widget.TextView d = new android.widget.TextView(ctx);
         d.setText("OUT: " + s);
-        d.setTextSize(12);
+        d.setTextIsSelectable(true);
+        d.setSingleLine(false);
         root.addView(d);
     }
 
     // WALLET
-    android.widget.TextView tvWal = new android.widget.TextView(ctx);
-    tvWal.setText("\nWALLET");
-    tvWal.setTypeface(null, android.graphics.Typeface.BOLD);
-    root.addView(tvWal);
+    String walletTxt = "Actual Sender: "+(actualSender!=null?actualSender:"unknown")+"\nActual Receiver: "+(actualReceiver!=null?actualReceiver:"unknown");
+    android.widget.LinearLayout waHead = new android.widget.LinearLayout(ctx);
+    waHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    android.widget.TextView tvWa = new android.widget.TextView(ctx);
+    tvWa.setText("\nWALLET"); tvWa.setTypeface(null, android.graphics.Typeface.BOLD);
+    tvWa.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+    waHead.addView(tvWa);
+    android.widget.ImageView ivWa = new android.widget.ImageView(ctx);
+    ivWa.setImageResource(R.drawable.ic_copy); ivWa.setColorFilter(iconColor);
+    ivWa.setTag(walletTxt); ivWa.setOnClickListener(copyListener);
+    waHead.addView(ivWa); root.addView(waHead);
+
     android.widget.LinearLayout rowAS = new android.widget.LinearLayout(ctx);
     rowAS.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvAS = new android.widget.TextView(ctx);
     tvAS.setText("Actual Sender: " + (actualSender!=null?actualSender:"unknown"));
     tvAS.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
+    tvAS.setTextIsSelectable(true);
     android.widget.ImageView ivAS = new android.widget.ImageView(ctx);
-    ivAS.setImageResource(R.drawable.ic_copy);
-    ivAS.setColorFilter(iconColor);
+    ivAS.setImageResource(R.drawable.ic_copy); ivAS.setColorFilter(iconColor);
     ivAS.setTag("Actual Sender:\n" + (actualSender!=null?actualSender:"unknown"));
     ivAS.setOnClickListener(copyListener);
-    rowAS.addView(tvAS); rowAS.addView(ivAS);
-    root.addView(rowAS);
+    rowAS.addView(tvAS); rowAS.addView(ivAS); root.addView(rowAS);
 
     android.widget.LinearLayout rowAR = new android.widget.LinearLayout(ctx);
     rowAR.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvAR = new android.widget.TextView(ctx);
     tvAR.setText("Actual Receiver: " + (actualReceiver!=null?actualReceiver:"unknown"));
     tvAR.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
+    tvAR.setTextIsSelectable(true);
     android.widget.ImageView ivAR = new android.widget.ImageView(ctx);
-    ivAR.setImageResource(R.drawable.ic_copy);
-    ivAR.setColorFilter(iconColor);
+    ivAR.setImageResource(R.drawable.ic_copy); ivAR.setColorFilter(iconColor);
     ivAR.setTag("Actual Receiver:\n" + (actualReceiver!=null?actualReceiver:"unknown"));
     ivAR.setOnClickListener(copyListener);
-    rowAR.addView(tvAR); rowAR.addView(ivAR);
-    root.addView(rowAR);
+    rowAR.addView(tvAR); rowAR.addView(ivAR); root.addView(rowAR);
 
     final StringBuilder plain = new StringBuilder();
     plain.append(txSent?"Sent":"Receive").append("\n").append(tx.getTxId()).append("\n\n");
-    plain.append("Time: ").append(timeStr).append("\nConfirmations: ").append(confs).append("\nBlock: ").append(height>0?height:"unconfirmed").append("\nStatus: ").append(status).append("\nNet: ").append(netValue!=null?netValue.toFriendlyString():"-").append("\n\n");
-    plain.append("Fee: ").append(fee!=null?fee.toFriendlyString():"0").append("\nFee rate: ").append(fee!=null?String.format(java.util.Locale.US,"%.1f",(double)fee.value/vsize):"-").append(" sat/vB\n\n");
-    plain.append("Version: ").append(version).append(" | Locktime: ").append(locktime).append("\nSize: ").append(tx.getMessageSize()).append(" | vSize: ").append(vsize).append(" | Weight: ").append(tx.getWeight()).append("\nInputs: ").append(tx.getInputs().size()).append(" | Outputs: ").append(tx.getOutputs().size()).append("\nRBF: ").append(rbf?"Yes":"No").append(" | SegWit: ").append(isSegWit?"Yes":"No").append(" | Coinbase: ").append(isCoinbase?"Yes":"No").append("\n");
-    if(opReturnData!=null) plain.append("OP_RETURN: ").append(opReturnData).append("\n");
-    plain.append("\nFROM\n").append(fromAll).append("\nTO\n").append(toAll).append("\n");
-    plain.append("Actual Sender: ").append(actualSender).append("\nActual Receiver: ").append(actualReceiver);
+    plain.append(overviewTxt).append("\n\n").append(amountTxt).append("\n\n").append(techTxt).append("\n\n");
+    plain.append(fromAllTxt).append("\n\n").append(toAllTxt).append("\n\n").append(detailsTxt).append("\n\n").append(walletTxt);
 
     new android.app.AlertDialog.Builder(activity)
         .setView(scroll)
