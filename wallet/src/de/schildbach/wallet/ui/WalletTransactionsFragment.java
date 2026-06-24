@@ -355,8 +355,8 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
 
 
         ////////////////test
-        
-    public void showTransactionDetails(final Sha256Hash transactionId) {
+
+public void showTransactionDetails(final Sha256Hash transactionId) {
     viewModel.selectedTransaction.setValue(transactionId);
     final Wallet wallet = viewModel.wallet.getValue();
     final Transaction tx = wallet.getTransaction(transactionId);
@@ -376,132 +376,179 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     boolean isSegWit = false;
     try {
         for (org.bitcoinj.core.TransactionInput in : tx.getInputs()) {
-            org.bitcoinj.core.TransactionOutput conn = in.getConnectedOutput();
-            if (conn != null) {
-                org.bitcoinj.core.Address a = conn.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
-                if (a != null && a.toString().startsWith("bc1")) { isSegWit = true; break; }
+            org.bitcoinj.core.TransactionOutput c = in.getConnectedOutput();
+            if (c!=null) {
+                org.bitcoinj.core.Address a = c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
+                if (a!=null && a.toString().startsWith("bc1")) { isSegWit=true; break; }
             }
         }
     } catch(Exception e){}
 
-    String status = confs <= 0 ? "PENDING" : confs < 6 ? "BUILDING" : "CONFIRMED";
-    String statusColor = status.equals("PENDING") ? "#FFA726" : status.equals("BUILDING") ? "#29B6F6" : "#66BB6A";
+    String status = confs<=0?"PENDING":confs<6?"BUILDING":"CONFIRMED";
+    String statusColor = status.equals("PENDING")?"#FFA726":status.equals("BUILDING")?"#29B6F6":"#66BB6A";
 
     org.bitcoinj.core.Coin totalFrom = org.bitcoinj.core.Coin.ZERO;
     java.util.List<String> fromLines = new java.util.ArrayList<>();
-    for (org.bitcoinj.core.TransactionInput in : tx.getInputs()) {
-        try { org.bitcoinj.core.TransactionOutput c = in.getConnectedOutput(); if(c!=null){ org.bitcoinj.core.Coin v=c.getValue(); if(v!=null) totalFrom=totalFrom.add(v); String addr="unknown"; try{addr=c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS).toString();}catch(Exception e){} fromLines.add(addr+" — "+(v!=null?v.toFriendlyString():"")); } } catch(Exception e){}
+    for(org.bitcoinj.core.TransactionInput in: tx.getInputs()){
+        try{ org.bitcoinj.core.TransactionOutput c=in.getConnectedOutput(); if(c!=null){ org.bitcoinj.core.Coin v=c.getValue(); if(v!=null) totalFrom=totalFrom.add(v); String a="unknown"; try{a=c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS).toString();}catch(Exception e){} fromLines.add(a+" — "+(v!=null?v.toFriendlyString():"")); } }catch(Exception e){}
     }
     org.bitcoinj.core.Coin totalTo = org.bitcoinj.core.Coin.ZERO;
     java.util.List<String> toLines = new java.util.ArrayList<>();
-    for (org.bitcoinj.core.TransactionOutput out : tx.getOutputs()) {
-        try { org.bitcoinj.core.Coin v=out.getValue(); if(v!=null) totalTo=totalTo.add(v); String addr="unknown"; try{addr=out.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS).toString();}catch(Exception e){} toLines.add(addr+" — "+(v!=null?v.toFriendlyString():"")); } catch(Exception e){}
+    for(org.bitcoinj.core.TransactionOutput out: tx.getOutputs()){
+        try{ org.bitcoinj.core.Coin v=out.getValue(); if(v!=null) totalTo=totalTo.add(v); String a="unknown"; try{a=out.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS).toString();}catch(Exception e){} toLines.add(a+" — "+(v!=null?v.toFriendlyString():"")); }catch(Exception e){}
     }
     org.bitcoinj.core.Address actualReceiver=null, actualSender=null;
-    try { actualReceiver = txSent ? WalletUtils.getToAddressOfSent(tx, wallet) : WalletUtils.getWalletAddressOfReceived(tx, wallet); } catch(Exception e){}
-    try { org.bitcoinj.core.Coin max=org.bitcoinj.core.Coin.ZERO; for(org.bitcoinj.core.TransactionInput in:tx.getInputs()){ org.bitcoinj.core.TransactionOutput c=in.getConnectedOutput(); if(c!=null&&c.getValue()!=null&&c.getValue().isGreaterThan(max)){max=c.getValue(); actualSender=c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);} } } catch(Exception e){}
+    try{ actualReceiver = txSent? WalletUtils.getToAddressOfSent(tx,wallet) : WalletUtils.getWalletAddressOfReceived(tx,wallet); }catch(Exception e){}
+    try{ org.bitcoinj.core.Coin max=org.bitcoinj.core.Coin.ZERO; for(org.bitcoinj.core.TransactionInput in:tx.getInputs()){ org.bitcoinj.core.TransactionOutput c=in.getConnectedOutput(); if(c!=null&&c.getValue()!=null&&c.getValue().isGreaterThan(max)){max=c.getValue(); actualSender=c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);} } }catch(Exception e){}
 
     android.content.Context ctx = activity;
-    int pad = (int)(12 * ctx.getResources().getDisplayMetrics().density);
+    int pad = (int)(12*ctx.getResources().getDisplayMetrics().density);
     android.widget.ScrollView scroll = new android.widget.ScrollView(ctx);
     android.widget.LinearLayout root = new android.widget.LinearLayout(ctx);
     root.setOrientation(android.widget.LinearLayout.VERTICAL);
     root.setPadding(pad,pad,pad,pad);
     scroll.addView(root);
 
-    android.view.View.OnClickListener copyListener = new android.view.View.OnClickListener() {
-        @Override public void onClick(android.view.View v) {
-            String txt = (String) v.getTag();
-            android.content.ClipboardManager cm = (android.content.ClipboardManager) ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-            cm.setPrimaryClip(android.content.ClipData.newPlainText("copy", txt));
-            android.widget.Toast.makeText(ctx, "Đã copy", android.widget.Toast.LENGTH_SHORT).show();
+    android.view.View.OnClickListener copyListener = new android.view.View.OnClickListener(){
+        @Override public void onClick(android.view.View v){
+            String txt=(String)v.getTag();
+            android.content.ClipboardManager cm=(android.content.ClipboardManager)ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("copy",txt));
+            android.widget.Toast.makeText(ctx,"Đã copy",android.widget.Toast.LENGTH_SHORT).show();
         }
     };
 
+    // ---- HEADER ----
+    android.widget.LinearLayout header = new android.widget.LinearLayout(ctx);
+    header.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     android.widget.TextView tvTitle = new android.widget.TextView(ctx);
-    tvTitle.setText(txSent ? "Sent" : "Received");
-    tvTitle.setTextSize(20); tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-    root.addView(tvTitle);
+    tvTitle.setText(txSent?"Sent":"Receive");
+    tvTitle.setTextSize(22); tvTitle.setTypeface(null,android.graphics.Typeface.BOLD);
+    tvTitle.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+    header.addView(tvTitle);
 
-    android.widget.LinearLayout rowHash = new android.widget.LinearLayout(ctx);
-    rowHash.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    android.widget.ImageView ivCopyTx = new android.widget.ImageView(ctx);
+    ivCopyTx.setImageResource(R.drawable.ic_copy);
+    ivCopyTx.setColorFilter(tvTitle.getCurrentTextColor());
+    ivCopyTx.setPadding(pad,0,0,0);
+    ivCopyTx.setTag((txSent?"Sent":"Receive")+"\n"+tx.getTxId().toString());
+    ivCopyTx.setOnClickListener(copyListener);
+    header.addView(ivCopyTx);
+    root.addView(header);
+
     android.widget.TextView tvHash = new android.widget.TextView(ctx);
     tvHash.setText(tx.getTxId().toString()); tvHash.setTextIsSelectable(true);
-    tvHash.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-    android.widget.ImageView ivHash = new android.widget.ImageView(ctx);
-    ivHash.setImageResource(android.R.drawable.ic_menu_edit); ivHash.setPadding(pad,0,0,0);
-    ivHash.setTag(tx.getTxId().toString()); ivHash.setOnClickListener(copyListener);
-    rowHash.addView(tvHash); rowHash.addView(ivHash);
-    root.addView(rowHash);
+    root.addView(tvHash);
 
+    // ---- INFO ----
     StringBuilder info = new StringBuilder();
     info.append("<br><b>Time:</b> ").append(timeStr).append("<br>");
     info.append("<b>Confirmations:</b> ").append(confs).append("<br>");
     info.append("<b>Block:</b> ").append(height>0?height:"unconfirmed").append("<br><br>");
     info.append("<b>Fee:</b> ").append(fee!=null?fee.toFriendlyString():"0 BTC").append("<br>");
-    try { int vsize=(tx.getWeight()+3)/4; if(fee!=null) info.append("<b>Fee rate:</b> ").append(String.format(java.util.Locale.US,"%.1f", (double)fee.value/vsize)).append(" sat/vB<br>"); } catch(Exception e){}
+    try{ int vsize=(tx.getWeight()+3)/4; if(fee!=null) info.append("<b>Fee rate:</b> ").append(String.format(java.util.Locale.US,"%.1f",(double)fee.value/vsize)).append(" sat/vB<br>"); }catch(Exception e){}
     info.append("<b>Size:</b> ").append(tx.getMessageSize()).append(" bytes | <b>Weight:</b> ").append(tx.getWeight()).append("<br>");
     info.append("<b>RBF:</b> ").append(rbf?"Yes":"No").append(" | <b>SegWit:</b> ").append(isSegWit?"Yes":"No").append("<br><br>");
     info.append("<b>Status:</b> <font color='").append(statusColor).append("'>").append(status).append("</font><br><br>");
-    info.append("<b>FROM</b><br><br>Total: ").append(totalFrom.toFriendlyString()).append(" from ").append(fromLines.size()).append("<br><br>");
-    for(String l: fromLines) info.append(l).append("<br><br>");
-    info.append("<b>TO</b><br><br>Total: ").append(totalTo.toFriendlyString()).append(" to ").append(toLines.size()).append("<br><br>");
-    for(String l: toLines) info.append(l).append("<br><br>");
     android.widget.TextView tvInfo = new android.widget.TextView(ctx);
-    tvInfo.setText(android.text.Html.fromHtml(info.toString(), android.text.Html.FROM_HTML_MODE_LEGACY));
+    tvInfo.setText(android.text.Html.fromHtml(info.toString(),android.text.Html.FROM_HTML_MODE_LEGACY));
     root.addView(tvInfo);
 
-    android.widget.TextView tvSenderLabel = new android.widget.TextView(ctx); tvSenderLabel.setText("Actual Sender:"); tvSenderLabel.setTypeface(null, android.graphics.Typeface.BOLD);
-    root.addView(tvSenderLabel);
-    android.widget.LinearLayout rowSender = new android.widget.LinearLayout(ctx); rowSender.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-    android.widget.TextView tvSender = new android.widget.TextView(ctx); tvSender.setText(actualSender!=null?actualSender.toString():"unknown"); tvSender.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,1f));
-    android.widget.ImageView ivSender = new android.widget.ImageView(ctx); ivSender.setImageResource(android.R.drawable.ic_menu_edit); ivSender.setPadding(pad,0,0,0);
-    ivSender.setTag(actualSender!=null?actualSender.toString():""); ivSender.setOnClickListener(copyListener);
-    rowSender.addView(tvSender); rowSender.addView(ivSender); root.addView(rowSender);
+    int iconColor = tvTitle.getCurrentTextColor();
 
-    android.widget.TextView tvRecLabel = new android.widget.TextView(ctx); tvRecLabel.setText("Actual Receiver:"); tvRecLabel.setTypeface(null, android.graphics.Typeface.BOLD);
-    root.addView(tvRecLabel);
-    android.widget.LinearLayout rowRec = new android.widget.LinearLayout(ctx); rowRec.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-    android.widget.TextView tvRec = new android.widget.TextView(ctx); tvRec.setText(actualReceiver!=null?actualReceiver.toString():"unknown"); tvRec.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,1f));
-    android.widget.ImageView ivRec = new android.widget.ImageView(ctx); ivRec.setImageResource(android.R.drawable.ic_menu_edit); ivRec.setPadding(pad,0,0,0);
-    ivRec.setTag(actualReceiver!=null?actualReceiver.toString():""); ivRec.setOnClickListener(copyListener);
-    rowRec.addView(tvRec); rowRec.addView(ivRec); root.addView(rowRec);
+    // ---- FROM ----
+    android.widget.LinearLayout fromHead = new android.widget.LinearLayout(ctx);
+    fromHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    android.widget.TextView tvFromH = new android.widget.TextView(ctx);
+    tvFromH.setText("FROM"); tvFromH.setTypeface(null,android.graphics.Typeface.BOLD);
+    tvFromH.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+    fromHead.addView(tvFromH);
+    StringBuilder fromAll = new StringBuilder("FROM\n\nTotal: ").append(totalFrom.toFriendlyString()).append(" from ").append(fromLines.size()).append("\n\n");
+    for(String l:fromLines) fromAll.append(l).append("\n");
+    android.widget.ImageView ivFromAll = new android.widget.ImageView(ctx);
+    ivFromAll.setImageResource(R.drawable.ic_copy); ivFromAll.setColorFilter(iconColor);
+    ivFromAll.setTag(fromAll.toString().trim()); ivFromAll.setOnClickListener(copyListener);
+    fromHead.addView(ivFromAll);
+    root.addView(fromHead);
 
+    android.widget.TextView tvFromTot = new android.widget.TextView(ctx);
+    tvFromTot.setText("Total: "+totalFrom.toFriendlyString()+" from "+fromLines.size());
+    root.addView(tvFromTot);
+
+    for(String l:fromLines){
+        android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        android.widget.TextView tv = new android.widget.TextView(ctx);
+        tv.setText(l); tv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+        android.widget.ImageView iv = new android.widget.ImageView(ctx);
+        iv.setImageResource(R.drawable.ic_copy); iv.setColorFilter(iconColor);
+        iv.setTag("FROM\n"+l); iv.setOnClickListener(copyListener);
+        row.addView(tv); row.addView(iv); root.addView(row);
+    }
+
+    // ---- TO ----
+    android.widget.LinearLayout toHead = new android.widget.LinearLayout(ctx);
+    toHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    android.widget.TextView tvToH = new android.widget.TextView(ctx);
+    tvToH.setText("TO"); tvToH.setTypeface(null,android.graphics.Typeface.BOLD);
+    tvToH.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+    toHead.addView(tvToH);
+    StringBuilder toAll = new StringBuilder("TO\n\nTotal: ").append(totalTo.toFriendlyString()).append(" to ").append(toLines.size()).append("\n\n");
+    for(String l:toLines) toAll.append(l).append("\n");
+    android.widget.ImageView ivToAll = new android.widget.ImageView(ctx);
+    ivToAll.setImageResource(R.drawable.ic_copy); ivToAll.setColorFilter(iconColor);
+    ivToAll.setTag(toAll.toString().trim()); ivToAll.setOnClickListener(copyListener);
+    toHead.addView(ivToAll);
+    root.addView(toHead);
+
+    android.widget.TextView tvToTot = new android.widget.TextView(ctx);
+    tvToTot.setText("Total: "+totalTo.toFriendlyString()+" to "+toLines.size());
+    root.addView(tvToTot);
+
+    for(String l:toLines){
+        android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        android.widget.TextView tv = new android.widget.TextView(ctx);
+        tv.setText(l); tv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+        android.widget.ImageView iv = new android.widget.ImageView(ctx);
+        iv.setImageResource(R.drawable.ic_copy); iv.setColorFilter(iconColor);
+        iv.setTag("TO\n"+l); iv.setOnClickListener(copyListener);
+        row.addView(tv); row.addView(iv); root.addView(row);
+    }
+
+    // ---- Actual ----
+    android.widget.TextView tvAS = new android.widget.TextView(ctx); tvAS.setText("Actual Sender:"); tvAS.setTypeface(null,android.graphics.Typeface.BOLD); root.addView(tvAS);
+    android.widget.LinearLayout rowAS = new android.widget.LinearLayout(ctx); rowAS.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    android.widget.TextView tvASv = new android.widget.TextView(ctx); tvASv.setText(actualSender!=null?actualSender.toString():"unknown"); tvASv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+    android.widget.ImageView ivAS = new android.widget.ImageView(ctx); ivAS.setImageResource(R.drawable.ic_copy); ivAS.setColorFilter(iconColor);
+    ivAS.setTag("Actual Sender:\n"+(actualSender!=null?actualSender:"unknown")); ivAS.setOnClickListener(copyListener);
+    rowAS.addView(tvASv); rowAS.addView(ivAS); root.addView(rowAS);
+
+    android.widget.TextView tvAR = new android.widget.TextView(ctx); tvAR.setText("Actual Receiver:"); tvAR.setTypeface(null,android.graphics.Typeface.BOLD); root.addView(tvAR);
+    android.widget.LinearLayout rowAR = new android.widget.LinearLayout(ctx); rowAR.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    android.widget.TextView tvARv = new android.widget.TextView(ctx); tvARv.setText(actualReceiver!=null?actualReceiver.toString():"unknown"); tvARv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0,-2,1));
+    android.widget.ImageView ivAR = new android.widget.ImageView(ctx); ivAR.setImageResource(R.drawable.ic_copy); ivAR.setColorFilter(iconColor);
+    ivAR.setTag("Actual Receiver:\n"+(actualReceiver!=null?actualReceiver:"unknown")); ivAR.setOnClickListener(copyListener);
+    rowAR.addView(tvARv); rowAR.addView(ivAR); root.addView(rowAR);
+
+    // ---- plain ALL ----
     StringBuilder plain = new StringBuilder();
-    plain.append(txSent ? "Sent" : "Received").append("\n");
-    plain.append(tx.getTxId().toString()).append("\n\n");
-    plain.append("Time: ").append(timeStr).append("\n");
-    plain.append("Confirmations: ").append(confs).append("\n");
-    plain.append("Block: ").append(height>0?height:"unconfirmed").append("\n\n");
-    plain.append("Fee: ").append(fee!=null?fee.toFriendlyString():"0 BTC").append("\n");
-    try { int vsize=(tx.getWeight()+3)/4; if(fee!=null) plain.append("Fee rate: ").append(String.format(java.util.Locale.US,"%.1f", (double)fee.value/vsize)).append(" sat/vB\n"); } catch(Exception e){}
-    plain.append("Size: ").append(tx.getMessageSize()).append(" bytes | Weight: ").append(tx.getWeight()).append("\n");
-    plain.append("RBF: ").append(rbf?"Yes":"No").append(" | SegWit: ").append(isSegWit?"Yes":"No").append("\n\n");
-    plain.append("Status: ").append(status).append("\n\n");
-    plain.append("FROM\n\n");
-    plain.append("Total: ").append(totalFrom.toFriendlyString()).append(" from ").append(fromLines.size()).append(fromLines.size()==1?" input":" inputs").append("\n\n");
-    for(String l: fromLines) plain.append(l).append("\n\n");
-    plain.append("TO\n\n");
-    plain.append("Total: ").append(totalTo.toFriendlyString()).append(" to ").append(toLines.size()).append(toLines.size()==1?" output":" outputs").append("\n\n");
-    for(String l: toLines) plain.append(l).append("\n\n");
-    plain.append("Actual Sender:\n").append(actualSender!=null?actualSender:"unknown").append("\n");
-    plain.append("Actual Receiver:\n").append(actualReceiver!=null?actualReceiver:"unknown");
+    plain.append(txSent?"Sent":"Receive").append("\n").append(tx.getTxId()).append("\n\n");
+    plain.append("Time: ").append(timeStr).append("\nConfirmations: ").append(confs).append("\nBlock: ").append(height>0?height:"unconfirmed").append("\n\n");
+    plain.append("FROM\n").append(fromAll).append("\nTO\n").append(toAll).append("\n");
+    plain.append("Actual Sender:\n").append(actualSender).append("\nActual Receiver:\n").append(actualReceiver);
     final String plainAll = plain.toString();
 
     new android.app.AlertDialog.Builder(activity)
         .setView(scroll)
-        .setPositiveButton("OK", null)
-        .setNeutralButton("COPY ALL", new android.content.DialogInterface.OnClickListener() {
-            @Override public void onClick(android.content.DialogInterface d, int w) {
-                android.content.ClipboardManager cm = (android.content.ClipboardManager) ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-                cm.setPrimaryClip(android.content.ClipData.newPlainText("tx", plainAll));
-                android.widget.Toast.makeText(ctx, "Copied all", android.widget.Toast.LENGTH_SHORT).show();
-            }
+        .setPositiveButton("OK",null)
+        .setNeutralButton("COPY ALL",(d,w)->{
+            android.content.ClipboardManager cm=(android.content.ClipboardManager)ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("tx",plainAll));
+            android.widget.Toast.makeText(ctx,"Copied all",android.widget.Toast.LENGTH_SHORT).show();
         })
-        .setNegativeButton("EXPLORER", new android.content.DialogInterface.OnClickListener() {
-            @Override public void onClick(android.content.DialogInterface d, int w) {
-                try { activity.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://mempool.space/tx/"+tx.getTxId()))); } catch(Exception e){}
-            }
+        .setNegativeButton("EXPLORER",(d,w)->{
+            try{ activity.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse("https://mempool.space/tx/"+tx.getTxId()))); }catch(Exception e){}
         })
         .show();
 }
