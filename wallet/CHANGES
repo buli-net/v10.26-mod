@@ -5,19 +5,16 @@ v10.26 mod by buli
 - wallet/src/de/schildbach/wallet/Constants.java [ // line 111. add code line 112 ]
 - wallet/res/xml/network_security_config.xml [ // line 14. add code line 15 ]
 - wallet/AndroidManifest.xml [ // line 70. add code line 71 ]
-- Create file: buli-net.github.io/version
-- Create file: buli-net.github.io/version-test
+- Create file: buli-net.github.io/version [ check version update mainnet ]
+- Create file: buli-net.github.io/version-test [ check version update testnet3 ]
 
 + update link check fees wallet.schildbach.de/fees ->. buli-net.github.io/fees
 - wallet/src/de/schildbach/wallet/Constants.java [ // line 116. add code line 117 ]
-- Create file buli-net.github.io/fees
-- Create file buli-net.github.io/fees-test
+- Create file buli-net.github.io/fees [ check fees mainnet ]
+- Create file buli-net.github.io/fees-test [ check fees testnet3 ]
 
-+ Create index
++ Create index [ web main index ]
 - Create file buli-net.github.io/index.html
-
-
-
 
 * - 21/06/2026
 + update email report: bitcoin.wallet.developers@gmail.com --> hvlrcb@gmail.com
