@@ -337,9 +337,9 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
             } catch (Exception e) {
             }
             fromLines.add(addr + " — " + (v != null ? v.toFriendlyString() : ""));
-            inDetails.add("IN #" + i + ": " + in.getOutpoint().getHash().toString() + ":" + in.getOutpoint().getIndex());
-            inDetails.add("   seq: " + in.getSequenceNumber() + (in.isOptInRBF() ? " (RBF)" : ""));
-            inDetails.add("   scriptSig: " + in.getScriptSig().toString());
+        inDetails.add("IN #" + i + ": " + in.getOutpoint().getHash().toString() + ":" + in.getOutpoint().getIndex());
+        inDetails.add("   seq: " + in.getSequenceNumber() + (in.getSequenceNumber() < 0xfffffffeL ? " (RBF)" : ""));
+        inDetails.add("   scriptSig: " + in.getScriptSig().toString());
             if (in.hasWitness()) {
                 inDetails.add("   witness: " + in.getWitness().toString());
             }
