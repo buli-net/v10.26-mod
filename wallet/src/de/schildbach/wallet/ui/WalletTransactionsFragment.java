@@ -350,14 +350,14 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
             fromLines.add(addr + " (" + typeIn + ") — " + (v != null ? v.toFriendlyString() : ""));
             inDetails.add("IN #" + i + ": " + in.getOutpoint().getHash().toString() + ":" + in.getOutpoint().getIndex());
             inDetails.add("   seq: " + in.getSequenceNumber() + (in.getSequenceNumber() < 0xfffffffeL ? " (RBF)" : ""));
-         
-          byte[] sigBytes = in.getScriptSig().getProgram();
-          String sig = sigBytes.length == 0 ? "<empty>" : "0x" + org.bitcoinj.core.Utils.HEX.encode(sigBytes);
+            byte[] sigBytes = in.getScriptSig().getProgram();
+            String sig = sigBytes.length == 0 ? "<empty>" : "0x" + org.bitcoinj.core.Utils.HEX.encode(sigBytes);
             inDetails.add("   scriptSig: " + sig);
-                if (in.hasWitness()) {
-                java.util.List<byte[]> pushes = in.getWitness().getPushes();
-                inDetails.add("   witness [" + pushes.size() + " items]:");
-                for (byte[] p : pushes) {
+            if (in.hasWitness()) {
+                int pushCount = in.getWitness().getPushCount();
+                inDetails.add("   witness [" + pushCount + " items]:");
+                for (int j = 0; j < pushCount; j++) {
+                    byte[] p = in.getWitness().getPush(j);
                     inDetails.add("     - 0x" + org.bitcoinj.core.Utils.HEX.encode(p));
                 }
             }
@@ -413,7 +413,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
             }
             toLines.add(addr + " — " + (v != null ? v.toFriendlyString() : ""));
             outDetails.add("OUT #" + i + ": " + type + " " + (v != null ? v.toFriendlyString() : ""));
-          String scr = "0x" + org.bitcoinj.core.Utils.HEX.encode(out.getScriptPubKey().getProgram());
+            String scr = "0x" + org.bitcoinj.core.Utils.HEX.encode(out.getScriptPubKey().getProgram());
             outDetails.add("   script: " + scr);
             outDetails.add("   dust: " + out.isDust());
             try {
@@ -1003,12 +1003,12 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
                         if (netValue != null) {
                             if (fiatNet.length() > 0) fiatNet.append("\n");
                             double val = netValue.getValue() * rate / 1e8;
-                            fiatNet.append(code.toUpperCase()).append(": ").append(String.format(java.util.Locale.US, (code.equals("vnd")||code.equals("jpy")||code.equals("krw")||code.equals("idr")||code.equals("clp")) ? "%,.0f" : "%,.8f", val));
+                            fiatNet.append(code.toUpperCase()).append(": ").append(String.format(java.util.Locale.US, "%,.8f", val));
                         }
                         if (fee != null) {
                             if (fiatFee.length() > 0) fiatFee.append("\n");
                             double val = fee.getValue() * rate / 1e8;
-                            fiatFee.append(code.toUpperCase()).append(": ").append(String.format(java.util.Locale.US, (code.equals("vnd")||code.equals("jpy")||code.equals("krw")||code.equals("idr")||code.equals("clp")) ? "%,.0f" : "%,.8f", val));
+                            fiatFee.append(code.toUpperCase()).append(": ").append(String.format(java.util.Locale.US, "%,.8f", val));
                         }
                     } catch (Exception ignored) {}
                 }
@@ -1058,7 +1058,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         }
     }).show();
 }
-
+        
 //end show transaction
         
     @Override
