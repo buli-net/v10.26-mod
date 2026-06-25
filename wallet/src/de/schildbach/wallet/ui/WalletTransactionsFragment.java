@@ -268,18 +268,23 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         return;
     }
 
+    // FIX 1: lấy activity trước khi dùng
+    final android.app.Activity activity = getActivity();
+    if (activity == null) return;
+
     boolean txSent = false;
     try {
         txSent = wallet != null && tx.getValue(wallet).signum() < 0;
     } catch (Exception e) {
     }
 
-    final org.bitcoinj.core.Coin netValue;
+    // FIX 2: final nhưng chỉ gán 1 lần bằng biến tạm
+    org.bitcoinj.core.Coin _netValue = null;
     try {
-        netValue = tx.getValue(wallet);
+        _netValue = tx.getValue(wallet);
     } catch (Exception e) {
-        netValue = null;
     }
+    final org.bitcoinj.core.Coin netValue = _netValue;
 
     int confs = 0;
     try {
@@ -293,12 +298,13 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     } catch (Exception e) {
     }
 
-    final org.bitcoinj.core.Coin fee;
+    // FIX 3: tương tự cho fee
+    org.bitcoinj.core.Coin _fee = null;
     try {
-        fee = tx.getFee();
+        _fee = tx.getFee();
     } catch (Exception e) {
-        fee = null;
     }
+    final org.bitcoinj.core.Coin fee = _fee;
 
     boolean rbf = false;
     try {
