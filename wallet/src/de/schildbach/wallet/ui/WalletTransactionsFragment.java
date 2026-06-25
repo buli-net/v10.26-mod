@@ -260,10 +260,8 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
 
         //add show transaction
 
-
-    
-    
-    public void showTransactionDetails(final Sha256Hash transactionId) {
+        
+public void showTransactionDetails(final Sha256Hash transactionId) {
     viewModel.selectedTransaction.setValue(transactionId);
     final Wallet wallet = viewModel.wallet.getValue();
     final Transaction tx = wallet.getTransaction(transactionId);
@@ -324,8 +322,9 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     org.bitcoinj.core.Coin totalFrom = org.bitcoinj.core.Coin.ZERO;
     java.util.List<String> fromLines = new java.util.ArrayList<String>();
     java.util.List<String> inDetails = new java.util.ArrayList<String>();
-    int inIndex = 0;
-    for (org.bitcoinj.core.TransactionInput in : tx.getInputs()) {
+
+    for (int i = 0; i < tx.getInputs().size(); i++) {
+        org.bitcoinj.core.TransactionInput in = tx.getInputs().get(i);
         try {
             org.bitcoinj.core.TransactionOutput c = in.getConnectedOutput();
             org.bitcoinj.core.Coin v = c != null ? c.getValue() : null;
@@ -338,15 +337,12 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
             } catch (Exception e) {
             }
             fromLines.add(addr + " — " + (v != null ? v.toFriendlyString() : ""));
-            String inHash = in.getOutpoint().getHash().toString();
-            long inVout = in.getOutpoint().getIndex();
-            inDetails.add("IN #" + inIndex + ": " + inHash + ":" + inVout);
-            inDetails.add("   seq: " + in.getSequenceNumber());
+            inDetails.add("IN #" + i + ": " + in.getOutpoint().getHash().toString() + ":" + in.getOutpoint().getIndex());
+            inDetails.add("   seq: " + in.getSequenceNumber() + (in.isOptInRBF() ? " (RBF)" : ""));
             inDetails.add("   scriptSig: " + in.getScriptSig().toString());
             if (in.hasWitness()) {
                 inDetails.add("   witness: " + in.getWitness().toString());
             }
-            inIndex++;
         } catch (Exception e) {
         }
     }
@@ -355,6 +351,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     java.util.List<String> toLines = new java.util.ArrayList<String>();
     java.util.List<String> outDetails = new java.util.ArrayList<String>();
     String opReturnData = null;
+
     for (int i = 0; i < tx.getOutputs().size(); i++) {
         org.bitcoinj.core.TransactionOutput out = tx.getOutputs().get(i);
         try {
@@ -367,7 +364,11 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
             try {
                 if (out.getScriptPubKey().isOpReturn()) {
                     type = "OP_RETURN";
-                    opReturnData = new String(out.getScriptPubKey().getChunks().get(1).data, "UTF-8");
+                    try {
+                        opReturnData = new String(out.getScriptPubKey().getChunks().get(1).data, "UTF-8");
+                    } catch (Exception e) {
+                        opReturnData = "binary";
+                    }
                 } else {
                     org.bitcoinj.core.Address a = out.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
                     if (a != null) {
@@ -391,6 +392,10 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
             outDetails.add("OUT #" + i + ": " + type + " " + (v != null ? v.toFriendlyString() : ""));
             outDetails.add("   script: " + out.getScriptPubKey().toString());
             outDetails.add("   dust: " + out.isDust());
+            try {
+                outDetails.add("   spent: " + out.isAvailableForSpending());
+            } catch (Exception e) {
+            }
         } catch (Exception e) {
         }
     }
@@ -398,20 +403,102 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     java.util.List<String> advDetails = new java.util.ArrayList<String>();
     try {
         advDetails.add("Confidence: " + tx.getConfidence().getConfidenceType());
+    } catch (Exception e) {
+    }
+    try {
         org.bitcoinj.core.Transaction over = tx.getConfidence().getOverridingTransaction();
         if (over != null) {
             advDetails.add("Overridden by: " + over.getTxId().toString());
         }
+    } catch (Exception e) {
+    }
+    try {
         advDetails.add("Broadcast peers: " + tx.getConfidence().numBroadcastPeers());
+    } catch (Exception e) {
+    }
+    try {
+        advDetails.add("Source: " + tx.getConfidence().getSource());
+    } catch (Exception e) {
+    }
+    try {
         advDetails.add("Purpose: " + tx.getPurpose());
-        if (tx.getMemo() != null) {
+    } catch (Exception e) {
+    }
+    try {
+        if (tx.getMemo() != null && !tx.getMemo().isEmpty()) {
             advDetails.add("Memo: " + tx.getMemo());
         }
+    } catch (Exception e) {
+    }
+    try {
         advDetails.add("SigOps: " + tx.getSigOpCount());
+    } catch (Exception e) {
+    }
+    try {
         advDetails.add("Has witness: " + tx.hasWitnesses());
+    } catch (Exception e) {
+    }
+    try {
         advDetails.add("Locktime enabled: " + (locktime > 0));
+    } catch (Exception e) {
+    }
+    try {
         advDetails.add("Optimal size: " + tx.getOptimalEncodingMessageSize() + " B");
     } catch (Exception e) {
+    }
+
+    java.util.List<String> debugDetails = new java.util.ArrayList<String>();
+    try {
+        debugDetails.add("Hash: " + tx.getHash().toString());
+    } catch (Exception e) {
+    }
+    try {
+        debugDetails.add("TxId: " + tx.getTxId().toString());
+    } catch (Exception e) {
+    }
+    try {
+        debugDetails.add("WTxId: " + tx.getWTxId().toString());
+    } catch (Exception e) {
+    }
+    try {
+        debugDetails.add("Mature: " + tx.isMature());
+    } catch (Exception e) {
+    }
+    try {
+        tx.verify();
+        debugDetails.add("Verify: PASS");
+    } catch (Exception e) {
+        debugDetails.add("Verify: FAIL");
+    }
+    try {
+        debugDetails.add("Relevant: " + wallet.isTransactionRelevant(tx));
+    } catch (Exception e) {
+    }
+    try {
+        debugDetails.add("Value from me: " + tx.getValueSentFromMe(wallet).toFriendlyString());
+    } catch (Exception e) {
+    }
+    try {
+        debugDetails.add("Value to me: " + tx.getValueSentToMe(wallet).toFriendlyString());
+    } catch (Exception e) {
+    }
+    try {
+        if (fee != null) {
+            debugDetails.add("Fee/weight: " + String.format(java.util.Locale.US, "%.2f", (double) fee.value / tx.getWeight()) + " sat/wu");
+        }
+    } catch (Exception e) {
+    }
+    try {
+        debugDetails.add("Update time: " + timeStr);
+    } catch (Exception e) {
+    }
+    for (int i = 0; i < tx.getInputs().size(); i++) {
+        try {
+            long seq = tx.getInput(i).getSequenceNumber();
+            boolean bip68 = seq < 0xfffffffeL;
+            debugDetails.add("IN#" + i + " BIP68: " + bip68);
+        } catch (Exception e) {
+        }
     }
 
     org.bitcoinj.core.Address actualReceiver = null;
@@ -758,6 +845,40 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
         root.addView(d);
     }
 
+    StringBuilder debugAll = new StringBuilder();
+    for (String s : debugDetails) {
+        debugAll.append(s).append("\n");
+    }
+    String debugFull = "OFFLINE DEBUG\n" + debugAll.toString().trim();
+    android.widget.LinearLayout dbHead = new android.widget.LinearLayout(ctx);
+    dbHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    dbHead.setGravity(android.view.Gravity.BOTTOM);
+    android.widget.TextView tvDb = new android.widget.TextView(ctx);
+    tvDb.setText("OFFLINE DEBUG");
+    tvDb.setTypeface(null, android.graphics.Typeface.BOLD);
+    tvDb.setPadding(0, padTop, 0, 0);
+    tvDb.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
+    dbHead.addView(tvDb);
+    android.widget.ImageView ivDb = new android.widget.ImageView(ctx);
+    ivDb.setImageResource(R.drawable.ic_copy);
+    ivDb.setColorFilter(iconColor);
+    ivDb.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+    android.widget.LinearLayout.LayoutParams lpDb = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
+    lpDb.bottomMargin = (int) (2 * density);
+    ivDb.setLayoutParams(lpDb);
+    ivDb.setTag(debugFull);
+    ivDb.setOnClickListener(copyListener);
+    dbHead.addView(ivDb);
+    root.addView(dbHead);
+    for (String s : debugDetails) {
+        android.widget.TextView d = new android.widget.TextView(ctx);
+        d.setText(s);
+        d.setTextIsSelectable(true);
+        d.setSingleLine(true);
+        d.setHorizontallyScrolling(true);
+        root.addView(d);
+    }
+
     String walletTxt = "Actual Sender: " + (actualSender != null ? actualSender : "unknown") + "\nActual Receiver: " + (actualReceiver != null ? actualReceiver : "unknown");
     String walletFull = "WALLET\n" + walletTxt;
     android.widget.LinearLayout waHead = new android.widget.LinearLayout(ctx);
@@ -831,6 +952,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     plain.append(toFull).append("\n\n");
     plain.append(detFull).append("\n\n");
     plain.append(advFull).append("\n\n");
+    plain.append(debugFull).append("\n\n");
     plain.append(walletFull);
 
     new android.app.AlertDialog.Builder(activity).setView(scroll).setPositiveButton("OK", null).setNeutralButton("COPY ALL", new android.content.DialogInterface.OnClickListener() {
@@ -848,7 +970,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
         }
     }).show();
 }
-
+    
 
         
 /*        
