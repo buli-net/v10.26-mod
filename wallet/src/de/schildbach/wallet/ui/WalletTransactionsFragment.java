@@ -415,7 +415,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
                 }
             } catch (Exception e) {
             }
-            toLines.add(addr + " — " + (v != null ? v.toFriendlyString() : ""));
+            toLines.add(addr + " (" + type + ")" + " - " + (v != null ? v.toFriendlyString() : ""));
             outDetails.add("OUT #" + i + ": " + type + " " + (v != null ? v.toFriendlyString() : ""));
             String scr = "0x" + org.bitcoinj.core.Utils.HEX.encode(out.getScriptPubKey().getProgram());
             outDetails.add("   script: " + scr);
