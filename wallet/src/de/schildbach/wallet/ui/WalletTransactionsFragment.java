@@ -397,7 +397,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
             } catch (Exception e) {
             }
             toLines.add(addr + " — " + (v != null ? v.toFriendlyString() : ""));
-            outDetails.add("OUT: #" + i + " " + type + " " + (v != null ? v.toFriendlyString() : ""));
+            outDetails.add("OUT #" + i + ": " + type + " " + (v != null ? v.toFriendlyString() : ""));
         } catch (Exception e) {
         }
     }
