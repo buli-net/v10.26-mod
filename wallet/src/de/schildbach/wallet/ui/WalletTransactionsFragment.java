@@ -259,7 +259,6 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     }
 
         //add show transaction
-
 public void showTransactionDetails(final Sha256Hash transactionId) {
     viewModel.selectedTransaction.setValue(transactionId);
     final Wallet wallet = viewModel.wallet.getValue();
@@ -351,7 +350,10 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
 
             String inHash = in.getOutpoint().getHash().toString();
             long inVout = in.getOutpoint().getIndex();
-            inDetails.add("IN: " + inHash + ":" + inVout + "\n   txid: " + inHash + "\n   vout: " + inVout + "\nSEQ: " + in.getSequenceNumber());
+            inDetails.add("IN: " + inHash + ":" + inVout);
+            inDetails.add("   txid: " + inHash);
+            inDetails.add("   vout: " + inVout);
+            inDetails.add("   seq: " + in.getSequenceNumber());
         } catch (Exception e) {
         }
     }
@@ -691,6 +693,13 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         d.setText(s);
         d.setTextIsSelectable(true);
         d.setSingleLine(false);
+        if (s.startsWith("   ")) {
+            d.setPadding((int)(12*density), 0, 0, 0);
+            if (s.trim().startsWith("seq:")) {
+                d.setTextSize(13);
+                d.setAlpha(0.85f);
+            }
+        }
         root.addView(d);
     }
     for (String s : outDetails) {
@@ -725,7 +734,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     waHead.addView(ivWa);
     root.addView(waHead);
 
-    // Actual Sender with copy
     android.widget.LinearLayout rowSender = new android.widget.LinearLayout(ctx);
     rowSender.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     rowSender.setGravity(android.view.Gravity.BOTTOM);
@@ -744,7 +752,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     rowSender.addView(ivAS);
     root.addView(rowSender);
 
-    // Actual Receiver with copy
     android.widget.LinearLayout rowReceiver = new android.widget.LinearLayout(ctx);
     rowReceiver.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     rowReceiver.setGravity(android.view.Gravity.BOTTOM);
@@ -789,7 +796,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         }
     }).show();
 }
-    
 //end show transaction
         
     @Override
