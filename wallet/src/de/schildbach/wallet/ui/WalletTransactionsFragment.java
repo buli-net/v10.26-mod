@@ -261,7 +261,9 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
         //add show transaction
 
 
-public void showTransactionDetails(final Sha256Hash transactionId) {
+    
+    
+    public void showTransactionDetails(final Sha256Hash transactionId) {
     viewModel.selectedTransaction.setValue(transactionId);
     final Wallet wallet = viewModel.wallet.getValue();
     final Transaction tx = wallet.getTransaction(transactionId);
@@ -396,9 +398,9 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     java.util.List<String> advDetails = new java.util.ArrayList<String>();
     try {
         advDetails.add("Confidence: " + tx.getConfidence().getConfidenceType());
-        org.bitcoinj.core.Sha256Hash over = tx.getConfidence().getOverridingTransaction();
+        org.bitcoinj.core.Transaction over = tx.getConfidence().getOverridingTransaction();
         if (over != null) {
-            advDetails.add("Overridden by: " + over.toString());
+            advDetails.add("Overridden by: " + over.getTxId().toString());
         }
         advDetails.add("Broadcast peers: " + tx.getConfidence().numBroadcastPeers());
         advDetails.add("Purpose: " + tx.getPurpose());
@@ -846,7 +848,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         }
     }).show();
 }
-
 
 
         
