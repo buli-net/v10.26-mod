@@ -274,10 +274,11 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     } catch (Exception e) {
     }
 
-    org.bitcoinj.core.Coin netValue = null;
+    final org.bitcoinj.core.Coin netValue;
     try {
         netValue = tx.getValue(wallet);
     } catch (Exception e) {
+        netValue = null;
     }
 
     int confs = 0;
@@ -292,10 +293,11 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     } catch (Exception e) {
     }
 
-    org.bitcoinj.core.Coin fee = null;
+    final org.bitcoinj.core.Coin fee;
     try {
         fee = tx.getFee();
     } catch (Exception e) {
+        fee = null;
     }
 
     boolean rbf = false;
@@ -331,11 +333,21 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
                 totalFrom = totalFrom.add(v);
             }
             String addr = "unknown";
+            String typeIn = "nonstandard";
             try {
-                addr = c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS).toString();
+                try {
+                    addr = c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS).toString();
+                } catch (Exception e1) {
+                    addr = c.getScriptPubKey().getToAddress(org.bitcoinj.params.TestNet3Params.get()).toString();
+                }
+                if (addr.startsWith("bc1q") || addr.startsWith("tb1q")) typeIn = "P2WPKH";
+                else if (addr.startsWith("bc1p") || addr.startsWith("tb1p")) typeIn = "P2TR";
+                else if (addr.startsWith("bc1") || addr.startsWith("tb1")) typeIn = "P2WSH";
+                else if (addr.startsWith("3") || addr.startsWith("2")) typeIn = "P2SH";
+                else if (addr.startsWith("1") || addr.startsWith("m") || addr.startsWith("n")) typeIn = "P2PKH";
             } catch (Exception e) {
             }
-            fromLines.add(addr + " — " + (v != null ? v.toFriendlyString() : ""));
+            fromLines.add(addr + " (" + typeIn + ") — " + (v != null ? v.toFriendlyString() : ""));
             inDetails.add("IN #" + i + ": " + in.getOutpoint().getHash().toString() + ":" + in.getOutpoint().getIndex());
             inDetails.add("   seq: " + in.getSequenceNumber() + (in.getSequenceNumber() < 0xfffffffeL ? " (RBF)" : ""));
          
@@ -343,7 +355,11 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
           String sig = sigBytes.length == 0 ? "<empty>" : "0x" + org.bitcoinj.core.Utils.HEX.encode(sigBytes);
             inDetails.add("   scriptSig: " + sig);
                 if (in.hasWitness()) {
-                inDetails.add("   witness: " + in.getWitness().toString());
+                java.util.List<byte[]> pushes = in.getWitness().getPushes();
+                inDetails.add("   witness [" + pushes.size() + " items]:");
+                for (byte[] p : pushes) {
+                    inDetails.add("     - 0x" + org.bitcoinj.core.Utils.HEX.encode(p));
+                }
             }
         } catch (Exception e) {
         }
@@ -372,18 +388,23 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
                         opReturnData = "binary";
                     }
                 } else {
-                    org.bitcoinj.core.Address a = out.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
+                    org.bitcoinj.core.Address a = null;
+                    try {
+                        a = out.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
+                    } catch (Exception e1) {
+                        a = out.getScriptPubKey().getToAddress(org.bitcoinj.params.TestNet3Params.get());
+                    }
                     if (a != null) {
                         addr = a.toString();
-                        if (addr.startsWith("bc1q")) {
+                        if (addr.startsWith("bc1q") || addr.startsWith("tb1q")) {
                             type = "P2WPKH";
-                        } else if (addr.startsWith("bc1p")) {
+                        } else if (addr.startsWith("bc1p") || addr.startsWith("tb1p")) {
                             type = "P2TR";
-                        } else if (addr.startsWith("bc1")) {
+                        } else if (addr.startsWith("bc1") || addr.startsWith("tb1")) {
                             type = "P2WSH";
-                        } else if (addr.startsWith("3")) {
+                        } else if (addr.startsWith("3") || addr.startsWith("2")) {
                             type = "P2SH";
-                        } else if (addr.startsWith("1")) {
+                        } else if (addr.startsWith("1") || addr.startsWith("m") || addr.startsWith("n")) {
                             type = "P2PKH";
                         }
                     }
@@ -439,6 +460,10 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     }
     try {
         advDetails.add("Has witness: " + tx.hasWitnesses());
+    } catch (Exception e) {
+    }
+    try {
+        advDetails.add("Replaceable: " + (rbf ? "Yes (BIP125)" : "No"));
     } catch (Exception e) {
     }
     try {
@@ -516,7 +541,11 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
             org.bitcoinj.core.TransactionOutput c = in.getConnectedOutput();
             if (c != null && c.getValue() != null && c.getValue().isGreaterThan(max)) {
                 max = c.getValue();
-                actualSender = c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
+                try {
+                    actualSender = c.getScriptPubKey().getToAddress(Constants.NETWORK_PARAMETERS);
+                } catch (Exception e1) {
+                    actualSender = c.getScriptPubKey().getToAddress(org.bitcoinj.params.TestNet3Params.get());
+                }
             }
         }
     } catch (Exception e) {
@@ -573,7 +602,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
 
     int iconColor = tvTitle.getCurrentTextColor();
 
-    String overviewTxt = "Time: " + timeStr + "\nConfirmations: " + confs + "\nBlock: " + (height > 0 ? height : "unconfirmed") + "\nStatus: " + status + "\nNet: " + (netValue != null ? netValue.toFriendlyString() : "-");
+    final String overviewTxt = "Time: " + timeStr + "\nConfirmations: " + confs + "\nBlock: " + (height > 0 ? height : "unconfirmed") + "\nStatus: " + status + "\nNet: " + (netValue != null ? netValue.toFriendlyString() : "-");
     String overviewFull = "OVERVIEW\n" + overviewTxt;
     android.widget.LinearLayout ovHead = new android.widget.LinearLayout(ctx);
     ovHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
@@ -595,12 +624,12 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     ivOv.setOnClickListener(copyListener);
     ovHead.addView(ivOv);
     root.addView(ovHead);
-    android.widget.TextView tvOvInfo = new android.widget.TextView(ctx);
-    tvOvInfo.setText(overviewTxt);
+    final android.widget.TextView tvOvInfo = new android.widget.TextView(ctx);
+    tvOvInfo.setText(overviewTxt + "\nNet fiat: loading...");
     tvOvInfo.setTextIsSelectable(true);
     root.addView(tvOvInfo);
 
-    String amountTxt = "Fee: " + (fee != null ? fee.toFriendlyString() : "0 BTC") + "\nFee rate: " + (fee != null ? String.format(java.util.Locale.US, "%.1f", (double) fee.value / vsize) : "-") + " sat/vB";
+    final String amountTxt = "Fee: " + (fee != null ? fee.toFriendlyString() : "0 BTC") + "\nFee rate: " + (fee != null ? String.format(java.util.Locale.US, "%.1f", (double) fee.value / vsize) : "-") + " sat/vB";
     String amountFull = "AMOUNT\n" + amountTxt;
     android.widget.LinearLayout amHead = new android.widget.LinearLayout(ctx);
     amHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
@@ -622,8 +651,8 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     ivAm.setOnClickListener(copyListener);
     amHead.addView(ivAm);
     root.addView(amHead);
-    android.widget.TextView tvAmInfo = new android.widget.TextView(ctx);
-    tvAmInfo.setText(amountTxt);
+    final android.widget.TextView tvAmInfo = new android.widget.TextView(ctx);
+    tvAmInfo.setText(amountTxt + "\nFee fiat: loading...");
     tvAmInfo.setTextIsSelectable(true);
     root.addView(tvAmInfo);
 
@@ -944,6 +973,62 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     rowReceiver.addView(tvAR);
     rowReceiver.addView(ivAR);
     root.addView(rowReceiver);
+
+    // FETCH FIAT - ALL CURRENCIES AUTO
+    new Thread(new Runnable() {
+        public void run() {
+            try {
+                java.net.URL url = new java.net.URL("https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false");
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
+                java.io.InputStream is = conn.getInputStream();
+                java.util.Scanner sc = new java.util.Scanner(is).useDelimiter("\\A");
+                String json = sc.hasNext() ? sc.next() : "";
+                sc.close();
+                
+                org.json.JSONObject prices = new org.json.JSONObject(json).getJSONObject("market_data").getJSONObject("current_price");
+                
+                final StringBuilder fiatNet = new StringBuilder();
+                final StringBuilder fiatFee = new StringBuilder();
+                
+                java.util.Iterator<String> keys = prices.keys();
+                java.util.ArrayList<String> fiatList = new java.util.ArrayList<>();
+                while (keys.hasNext()) fiatList.add(keys.next());
+                java.util.Collections.sort(fiatList);
+                
+                for (String code : fiatList) {
+                    try {
+                        double rate = prices.getDouble(code);
+                        if (netValue != null) {
+                            if (fiatNet.length() > 0) fiatNet.append("\n");
+                            double val = netValue.getValue() * rate / 1e8;
+                            fiatNet.append(code.toUpperCase()).append(": ").append(String.format(java.util.Locale.US, (code.equals("vnd")||code.equals("jpy")||code.equals("krw")||code.equals("idr")||code.equals("clp")) ? "%,.0f" : "%,.8f", val));
+                        }
+                        if (fee != null) {
+                            if (fiatFee.length() > 0) fiatFee.append("\n");
+                            double val = fee.getValue() * rate / 1e8;
+                            fiatFee.append(code.toUpperCase()).append(": ").append(String.format(java.util.Locale.US, (code.equals("vnd")||code.equals("jpy")||code.equals("krw")||code.equals("idr")||code.equals("clp")) ? "%,.0f" : "%,.8f", val));
+                        }
+                    } catch (Exception ignored) {}
+                }
+                
+                activity.runOnUiThread(new Runnable() {
+                    public void run() {
+                        tvOvInfo.setText(overviewTxt + "\n\nNet fiat (" + fiatList.size() + " currencies):\n" + fiatNet.toString());
+                        tvAmInfo.setText(amountTxt + "\n\nFee fiat:\n" + fiatFee.toString());
+                    }
+                });
+            } catch (Exception e) {
+                activity.runOnUiThread(new Runnable() {
+                    public void run() {
+                        tvOvInfo.setText(overviewTxt + "\nNet fiat: offline");
+                        tvAmInfo.setText(amountTxt + "\nFee fiat: offline");
+                    }
+                });
+            }
+        }
+    }).start();
 
     final StringBuilder plain = new StringBuilder();
     plain.append(txSent ? "Sent" : "Receive").append("\n");
