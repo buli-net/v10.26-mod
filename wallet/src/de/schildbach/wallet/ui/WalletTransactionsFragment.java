@@ -260,6 +260,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
 
         //add show transaction
 
+
 public void showTransactionDetails(final Sha256Hash transactionId) {
     viewModel.selectedTransaction.setValue(transactionId);
     final Wallet wallet = viewModel.wallet.getValue();
@@ -268,7 +269,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         return;
     }
 
-    // FIX 1: lấy activity trước khi dùng
     final android.app.Activity activity = getActivity();
     if (activity == null) return;
 
@@ -278,7 +278,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     } catch (Exception e) {
     }
 
-    // FIX 2: final nhưng chỉ gán 1 lần bằng biến tạm
     org.bitcoinj.core.Coin _netValue = null;
     try {
         _netValue = tx.getValue(wallet);
@@ -298,7 +297,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     } catch (Exception e) {
     }
 
-    // FIX 3: tương tự cho fee
     org.bitcoinj.core.Coin _fee = null;
     try {
         _fee = tx.getFee();
@@ -576,7 +574,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
             String txt = (String) v.getTag();
             android.content.ClipboardManager cm = (android.content.ClipboardManager) ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
             cm.setPrimaryClip(android.content.ClipData.newPlainText("copy", txt));
-            android.widget.Toast.makeText(ctx, "Đã copy", android.widget.Toast.LENGTH_SHORT).show();
+            android.widget.Toast.makeText(ctx, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show();
         }
     };
 
@@ -631,7 +629,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     ovHead.addView(ivOv);
     root.addView(ovHead);
     final android.widget.TextView tvOvInfo = new android.widget.TextView(ctx);
-    tvOvInfo.setText(overviewTxt + "\nNet fiat: loading...");
+    tvOvInfo.setText(overviewTxt);
     tvOvInfo.setTextIsSelectable(true);
     root.addView(tvOvInfo);
 
@@ -658,7 +656,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     amHead.addView(ivAm);
     root.addView(amHead);
     final android.widget.TextView tvAmInfo = new android.widget.TextView(ctx);
-    tvAmInfo.setText(amountTxt + "\nFee fiat: loading...");
+    tvAmInfo.setText(amountTxt);
     tvAmInfo.setTextIsSelectable(true);
     root.addView(tvAmInfo);
 
@@ -980,62 +978,6 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
     rowReceiver.addView(ivAR);
     root.addView(rowReceiver);
 
-    // FETCH FIAT - ALL CURRENCIES AUTO
-    new Thread(new Runnable() {
-        public void run() {
-            try {
-                java.net.URL url = new java.net.URL("https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false");
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(8000);
-                conn.setReadTimeout(8000);
-                java.io.InputStream is = conn.getInputStream();
-                java.util.Scanner sc = new java.util.Scanner(is).useDelimiter("\\A");
-                String json = sc.hasNext() ? sc.next() : "";
-                sc.close();
-                
-                org.json.JSONObject prices = new org.json.JSONObject(json).getJSONObject("market_data").getJSONObject("current_price");
-                
-                final StringBuilder fiatNet = new StringBuilder();
-                final StringBuilder fiatFee = new StringBuilder();
-                
-                java.util.Iterator<String> keys = prices.keys();
-                java.util.ArrayList<String> fiatList = new java.util.ArrayList<>();
-                while (keys.hasNext()) fiatList.add(keys.next());
-                java.util.Collections.sort(fiatList);
-                
-                for (String code : fiatList) {
-                    try {
-                        double rate = prices.getDouble(code);
-                        if (netValue != null) {
-                            if (fiatNet.length() > 0) fiatNet.append("\n");
-                            double val = netValue.getValue() * rate / 1e8;
-                            fiatNet.append(code.toUpperCase()).append(": ").append(String.format(java.util.Locale.US, "%,.8f", val));
-                        }
-                        if (fee != null) {
-                            if (fiatFee.length() > 0) fiatFee.append("\n");
-                            double val = fee.getValue() * rate / 1e8;
-                            fiatFee.append(code.toUpperCase()).append(": ").append(String.format(java.util.Locale.US, "%,.8f", val));
-                        }
-                    } catch (Exception ignored) {}
-                }
-                
-                activity.runOnUiThread(new Runnable() {
-                    public void run() {
-                        tvOvInfo.setText(overviewTxt + "\n\nNet fiat (" + fiatList.size() + " currencies):\n" + fiatNet.toString());
-                        tvAmInfo.setText(amountTxt + "\n\nFee fiat:\n" + fiatFee.toString());
-                    }
-                });
-            } catch (Exception e) {
-                activity.runOnUiThread(new Runnable() {
-                    public void run() {
-                        tvOvInfo.setText(overviewTxt + "\nNet fiat: offline");
-                        tvAmInfo.setText(amountTxt + "\nFee fiat: offline");
-                    }
-                });
-            }
-        }
-    }).start();
-
     final StringBuilder plain = new StringBuilder();
     plain.append(txSent ? "Sent" : "Receive").append("\n");
     plain.append(tx.getTxId().toString()).append("\n\n");
@@ -1064,6 +1006,8 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         }
     }).show();
 }
+
+
         
 //end show transaction
         
