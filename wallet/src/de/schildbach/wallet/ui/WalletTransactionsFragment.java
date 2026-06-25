@@ -260,7 +260,6 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
 
         //add show transaction
 
-        
 public void showTransactionDetails(final Sha256Hash transactionId) {
     viewModel.selectedTransaction.setValue(transactionId);
     final Wallet wallet = viewModel.wallet.getValue();
@@ -337,9 +336,10 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
             } catch (Exception e) {
             }
             fromLines.add(addr + " — " + (v != null ? v.toFriendlyString() : ""));
-        inDetails.add("IN #" + i + ": " + in.getOutpoint().getHash().toString() + ":" + in.getOutpoint().getIndex());
-        inDetails.add("   seq: " + in.getSequenceNumber() + (in.getSequenceNumber() < 0xfffffffeL ? " (RBF)" : ""));
-        inDetails.add("   scriptSig: " + in.getScriptSig().toString());
+            inDetails.add("IN #" + i + ": " + in.getOutpoint().getHash().toString() + ":" + in.getOutpoint().getIndex());
+            inDetails.add("   seq: " + in.getSequenceNumber() + (in.getSequenceNumber() < 0xfffffffeL ? " (RBF)" : ""));
+            String sig = in.getScriptSig().toString().replaceAll("\\p{C}", "");
+            inDetails.add("   scriptSig: " + (sig.isEmpty() ? "<empty>" : sig));
             if (in.hasWitness()) {
                 inDetails.add("   witness: " + in.getWitness().toString());
             }
@@ -390,7 +390,9 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
             }
             toLines.add(addr + " — " + (v != null ? v.toFriendlyString() : ""));
             outDetails.add("OUT #" + i + ": " + type + " " + (v != null ? v.toFriendlyString() : ""));
-            outDetails.add("   script: " + out.getScriptPubKey().toString());
+            String scr = out.getScriptPubKey().toString().replaceAll("\\p{C}", "");
+            scr = scr.replace("\u0000", "OP_0");
+            outDetails.add("   script: " + scr);
             outDetails.add("   dust: " + out.isDust());
             try {
                 outDetails.add("   spent: " + out.isAvailableForSpending());
@@ -970,8 +972,8 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
         }
     }).show();
 }
-    
 
+    
         
 /*        
 
