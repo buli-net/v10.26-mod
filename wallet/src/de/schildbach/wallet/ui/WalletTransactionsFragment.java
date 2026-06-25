@@ -260,7 +260,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
 
         //add show transaction
 
-        public void showTransactionDetails(final Sha256Hash transactionId) {
+public void showTransactionDetails(final Sha256Hash transactionId) {
     viewModel.selectedTransaction.setValue(transactionId);
     final Wallet wallet = viewModel.wallet.getValue();
     final Transaction tx = wallet.getTransaction(transactionId);
@@ -348,7 +348,10 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
             } catch (Exception e) {
             }
             fromLines.add(addr + " — " + (v != null ? v.toFriendlyString() : ""));
-            inDetails.add("IN: " + in.getOutpoint().toString() + "\nSEQ: " + in.getSequenceNumber());
+
+            String inHash = in.getOutpoint().getHash().toString();
+            long inVout = in.getOutpoint().getIndex();
+            inDetails.add("IN: " + inHash + ":" + inVout + "\n   txid: " + inHash + "\n   vout: " + inVout + "\nSEQ: " + in.getSequenceNumber());
         } catch (Exception e) {
         }
     }
@@ -421,9 +424,11 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     int iconSize = (int) (20 * density);
 
     android.widget.ScrollView scroll = new android.widget.ScrollView(ctx);
+    scroll.setClipToPadding(false);
     android.widget.LinearLayout root = new android.widget.LinearLayout(ctx);
     root.setOrientation(android.widget.LinearLayout.VERTICAL);
-    root.setPadding(pad, pad, pad, pad);
+    root.setPadding(pad, (int)(24*density), pad, pad);
+    root.setClipToPadding(false);
     scroll.addView(root);
 
     final android.view.View.OnClickListener copyListener = new android.view.View.OnClickListener() {
@@ -463,6 +468,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
 
     // OVERVIEW
     String overviewTxt = "Time: " + timeStr + "\nConfirmations: " + confs + "\nBlock: " + (height > 0 ? height : "unconfirmed") + "\nStatus: " + status + "\nNet: " + (netValue != null ? netValue.toFriendlyString() : "-");
+    String overviewFull = "OVERVIEW\n" + overviewTxt;
     android.widget.LinearLayout ovHead = new android.widget.LinearLayout(ctx);
     ovHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     ovHead.setGravity(android.view.Gravity.BOTTOM);
@@ -479,7 +485,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     android.widget.LinearLayout.LayoutParams lpOv = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
     lpOv.bottomMargin = (int) (2 * density);
     ivOv.setLayoutParams(lpOv);
-    ivOv.setTag(overviewTxt);
+    ivOv.setTag(overviewFull);
     ivOv.setOnClickListener(copyListener);
     ovHead.addView(ivOv);
     root.addView(ovHead);
@@ -490,6 +496,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
 
     // AMOUNT
     String amountTxt = "Fee: " + (fee != null ? fee.toFriendlyString() : "0 BTC") + "\nFee rate: " + (fee != null ? String.format(java.util.Locale.US, "%.1f", (double) fee.value / vsize) : "-") + " sat/vB";
+    String amountFull = "AMOUNT\n" + amountTxt;
     android.widget.LinearLayout amHead = new android.widget.LinearLayout(ctx);
     amHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     amHead.setGravity(android.view.Gravity.BOTTOM);
@@ -506,7 +513,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     android.widget.LinearLayout.LayoutParams lpAm = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
     lpAm.bottomMargin = (int) (2 * density);
     ivAm.setLayoutParams(lpAm);
-    ivAm.setTag(amountTxt);
+    ivAm.setTag(amountFull);
     ivAm.setOnClickListener(copyListener);
     amHead.addView(ivAm);
     root.addView(amHead);
@@ -524,6 +531,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     if (opReturnData != null) {
         tech.append("\nOP_RETURN: ").append(opReturnData);
     }
+    String techFull = "TECHNICAL\n" + tech.toString();
     android.widget.LinearLayout teHead = new android.widget.LinearLayout(ctx);
     teHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     teHead.setGravity(android.view.Gravity.BOTTOM);
@@ -540,7 +548,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     android.widget.LinearLayout.LayoutParams lpTe = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
     lpTe.bottomMargin = (int) (2 * density);
     ivTe.setLayoutParams(lpTe);
-    ivTe.setTag(tech.toString());
+    ivTe.setTag(techFull);
     ivTe.setOnClickListener(copyListener);
     teHead.addView(ivTe);
     root.addView(teHead);
@@ -555,6 +563,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
         fromAll.append(s).append("\n");
     }
     String fromTxt = "Total: " + totalFrom.toFriendlyString() + " from " + fromLines.size() + "\n" + fromAll.toString().trim();
+    String fromFull = "FROM\n" + fromTxt;
     android.widget.LinearLayout frHead = new android.widget.LinearLayout(ctx);
     frHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     frHead.setGravity(android.view.Gravity.BOTTOM);
@@ -571,7 +580,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     android.widget.LinearLayout.LayoutParams lpFr = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
     lpFr.bottomMargin = (int) (2 * density);
     ivFr.setLayoutParams(lpFr);
-    ivFr.setTag(fromTxt);
+    ivFr.setTag(fromFull);
     ivFr.setOnClickListener(copyListener);
     frHead.addView(ivFr);
     root.addView(frHead);
@@ -604,6 +613,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
         toAll.append(s).append("\n");
     }
     String toTxt = "Total: " + totalTo.toFriendlyString() + " to " + toLines.size() + "\n" + toAll.toString().trim();
+    String toFull = "TO\n" + toTxt;
     android.widget.LinearLayout toHead = new android.widget.LinearLayout(ctx);
     toHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     toHead.setGravity(android.view.Gravity.BOTTOM);
@@ -620,7 +630,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     android.widget.LinearLayout.LayoutParams lpTo = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
     lpTo.bottomMargin = (int) (2 * density);
     ivTo.setLayoutParams(lpTo);
-    ivTo.setTag(toTxt);
+    ivTo.setTag(toFull);
     ivTo.setOnClickListener(copyListener);
     toHead.addView(ivTo);
     root.addView(toHead);
@@ -655,6 +665,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     for (String s : outDetails) {
         det.append(s).append("\n");
     }
+    String detFull = "DETAILS\n" + det.toString().trim();
     android.widget.LinearLayout deHead = new android.widget.LinearLayout(ctx);
     deHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     deHead.setGravity(android.view.Gravity.BOTTOM);
@@ -671,7 +682,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     android.widget.LinearLayout.LayoutParams lpDe = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
     lpDe.bottomMargin = (int) (2 * density);
     ivDe.setLayoutParams(lpDe);
-    ivDe.setTag(det.toString().trim());
+    ivDe.setTag(detFull);
     ivDe.setOnClickListener(copyListener);
     deHead.addView(ivDe);
     root.addView(deHead);
@@ -692,6 +703,7 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
 
     // WALLET
     String walletTxt = "Actual Sender: " + (actualSender != null ? actualSender : "unknown") + "\nActual Receiver: " + (actualReceiver != null ? actualReceiver : "unknown");
+    String walletFull = "WALLET\n" + walletTxt;
     android.widget.LinearLayout waHead = new android.widget.LinearLayout(ctx);
     waHead.setOrientation(android.widget.LinearLayout.HORIZONTAL);
     waHead.setGravity(android.view.Gravity.BOTTOM);
@@ -708,23 +720,59 @@ public class WalletTransactionsFragment extends Fragment implements Transactions
     android.widget.LinearLayout.LayoutParams lpWa = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
     lpWa.bottomMargin = (int) (2 * density);
     ivWa.setLayoutParams(lpWa);
-    ivWa.setTag(walletTxt);
+    ivWa.setTag(walletFull);
     ivWa.setOnClickListener(copyListener);
     waHead.addView(ivWa);
     root.addView(waHead);
+
+    // Actual Sender with copy
+    android.widget.LinearLayout rowSender = new android.widget.LinearLayout(ctx);
+    rowSender.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    rowSender.setGravity(android.view.Gravity.BOTTOM);
     android.widget.TextView tvAS = new android.widget.TextView(ctx);
     tvAS.setText("Actual Sender: " + (actualSender != null ? actualSender : "unknown"));
     tvAS.setTextIsSelectable(true);
-    root.addView(tvAS);
+    tvAS.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
+    android.widget.ImageView ivAS = new android.widget.ImageView(ctx);
+    ivAS.setImageResource(R.drawable.ic_copy);
+    ivAS.setColorFilter(iconColor);
+    ivAS.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+    ivAS.setLayoutParams(new android.widget.LinearLayout.LayoutParams(iconSize, iconSize));
+    ivAS.setTag(actualSender != null ? actualSender.toString() : "unknown");
+    ivAS.setOnClickListener(copyListener);
+    rowSender.addView(tvAS);
+    rowSender.addView(ivAS);
+    root.addView(rowSender);
+
+    // Actual Receiver with copy
+    android.widget.LinearLayout rowReceiver = new android.widget.LinearLayout(ctx);
+    rowReceiver.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    rowReceiver.setGravity(android.view.Gravity.BOTTOM);
     android.widget.TextView tvAR = new android.widget.TextView(ctx);
     tvAR.setText("Actual Receiver: " + (actualReceiver != null ? actualReceiver : "unknown"));
     tvAR.setTextIsSelectable(true);
-    root.addView(tvAR);
+    tvAR.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, -2, 1));
+    android.widget.ImageView ivAR = new android.widget.ImageView(ctx);
+    ivAR.setImageResource(R.drawable.ic_copy);
+    ivAR.setColorFilter(iconColor);
+    ivAR.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+    ivAR.setLayoutParams(new android.widget.LinearLayout.LayoutParams(iconSize, iconSize));
+    ivAR.setTag(actualReceiver != null ? actualReceiver.toString() : "unknown");
+    ivAR.setOnClickListener(copyListener);
+    rowReceiver.addView(tvAR);
+    rowReceiver.addView(ivAR);
+    root.addView(rowReceiver);
 
     final StringBuilder plain = new StringBuilder();
-    plain.append(txSent ? "Sent" : "Receive").append("\n").append(tx.getTxId()).append("\n\n");
-    plain.append(overviewTxt).append("\n\n").append(amountTxt).append("\n\n").append(tech).append("\n\n");
-    plain.append(fromTxt).append("\n\n").append(toTxt).append("\n\n").append(det).append("\n\n").append(walletTxt);
+    plain.append(txSent ? "Sent" : "Receive").append("\n");
+    plain.append(tx.getTxId().toString()).append("\n\n");
+    plain.append(overviewFull).append("\n\n");
+    plain.append(amountFull).append("\n\n");
+    plain.append(techFull).append("\n\n");
+    plain.append(fromFull).append("\n\n");
+    plain.append(toFull).append("\n\n");
+    plain.append(detFull).append("\n\n");
+    plain.append(walletFull);
 
     new android.app.AlertDialog.Builder(activity).setView(scroll).setPositiveButton("OK", null).setNeutralButton("COPY ALL", new android.content.DialogInterface.OnClickListener() {
         public void onClick(android.content.DialogInterface d, int w) {
