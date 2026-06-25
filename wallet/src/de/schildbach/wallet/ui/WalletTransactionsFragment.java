@@ -338,9 +338,11 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
             fromLines.add(addr + " — " + (v != null ? v.toFriendlyString() : ""));
             inDetails.add("IN #" + i + ": " + in.getOutpoint().getHash().toString() + ":" + in.getOutpoint().getIndex());
             inDetails.add("   seq: " + in.getSequenceNumber() + (in.getSequenceNumber() < 0xfffffffeL ? " (RBF)" : ""));
-            String sig = in.getScriptSig().toString().replaceAll("\\p{C}", "");
-            inDetails.add("   scriptSig: " + (sig.isEmpty() ? "<empty>" : sig));
-            if (in.hasWitness()) {
+         
+          byte[] sigBytes = in.getScriptSig().getProgram();
+          String sig = sigBytes.length == 0 ? "<empty>" : "0x" + org.bitcoinj.core.Utils.HEX.encode(sigBytes);
+            inDetails.add("   scriptSig: " + sig);
+                if (in.hasWitness()) {
                 inDetails.add("   witness: " + in.getWitness().toString());
             }
         } catch (Exception e) {
@@ -390,8 +392,7 @@ public void showTransactionDetails(final Sha256Hash transactionId) {
             }
             toLines.add(addr + " — " + (v != null ? v.toFriendlyString() : ""));
             outDetails.add("OUT #" + i + ": " + type + " " + (v != null ? v.toFriendlyString() : ""));
-            String scr = out.getScriptPubKey().toString().replaceAll("\\p{C}", "");
-            scr = scr.replace("\u0000", "OP_0");
+          String scr = "0x" + org.bitcoinj.core.Utils.HEX.encode(out.getScriptPubKey().getProgram());
             outDetails.add("   script: " + scr);
             outDetails.add("   dust: " + out.isDust());
             try {
