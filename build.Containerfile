@@ -1,12 +1,15 @@
 #
 # Reproducible reference build - fixed for 2026
 #
+# Usage:
+# buildah build --cap-add sys_admin --device /dev/fuse --file build.Containerfile --output <out> .
+#
+
 FROM debian:bullseye-slim AS build-stage
 
-# bullseye đã EOL, dùng archive
+# bullseye đã EOL -> dùng archive, bỏ security repo
 ENV DEBIAN_FRONTEND=noninteractive
 RUN echo 'deb http://archive.debian.org/debian bullseye main' > /etc/apt/sources.list && \
-    echo 'deb http://archive.debian.org/debian-security bullseye-security main' >> /etc/apt/sources.list && \
     echo 'deb http://archive.debian.org/debian bullseye-backports main' >> /etc/apt/sources.list && \
     echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check
 
