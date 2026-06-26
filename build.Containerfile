@@ -2,7 +2,8 @@ FROM debian:bullseye-slim AS build-stage
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN echo 'deb http://archive.debian.org/debian bullseye main' > /etc/apt/sources.list && \
-    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt.conf.d/99no-check
+    mkdir -p /etc/apt/apt.conf.d && \
+    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check
 
 RUN apt-get update && \
     apt-get -y install --no-install-recommends disorderfs openjdk-11-jdk-headless gradle wget unzip && \
