@@ -1,0 +1,97 @@
+name: F-Droid Reproducible Build Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.gradle'
+      - '**.java'
+      - 'build.Containerfile'
+      - 'wallet/**'
+
+jobs:
+  fdroid-check:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout full repository history (needed for versionCode)
+      - name: 1. Checkout source
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # 2. Print environment info for reproducibility
+      - name: 2. Runner info
+        run: |
+          echo "=== F-DROID BUILD CHECK ==="
+          echo "Date (UTC): $(date -u)"
+          echo "Commit: $(git rev-parse HEAD)"
+          uname -a
+
+      # 3. Setup Docker Buildx (F-Droid uses Debian, we replicate with container)
+      - name: 3. Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 4. Build APKs using the official Containerfile (no signing)
+      # This replicates F-Droid's clean build environment: Debian bullseye + JDK11 + Gradle 4.4.1
+      - name: 4. Build unsigned APKs
+        run: |
+          mkdir -p out-fdroid
+          DOCKER_BUILDKIT=1 docker build \
+            -f build.Containerfile \
+            --target export-stage \
+            --output type=local,dest=out-fdroid \
+            .
+          echo "=== BUILT APKs ==="
+          find out-fdroid -name "*.apk" -exec ls -lh {} \;
+
+      # 5. Find aapt to dump APK metadata (F-Droid verifies versionName/versionCode)
+      - name: 5. Install Android tools for inspection
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'build-tools;34.0.0'
+
+      - name: 6. Locate aapt
+        run: |
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)
+          echo "AAPT=$AAPT" >> $GITHUB_ENV
+
+      # 7. Dump APK information (must match F-Droid metadata)
+      - name: 7. Dump APK metadata
+        run: |
+          echo "=== APK METADATA ===" > fdroid-report.txt
+          for apk in out-fdroid/apk/*/*/*.apk; do
+            echo "--- $(basename $apk) ---" | tee -a fdroid-report.txt
+            "$AAPT" dump badging "$apk" | grep -E "package:|versionName|versionCode|sdkVersion|native-code" | tee -a fdroid-report.txt
+          done
+
+      # 8. Generate SHA256 checksums (compare with F-Droid build)
+      - name: 8. Generate checksums
+        run: |
+          echo "" >> fdroid-report.txt
+          echo "=== SHA256 CHECKSUMS ===" >> fdroid-report.txt
+          sha256sum out-fdroid/apk/*/*/*.apk | tee -a fdroid-report.txt
+          
+          echo "" >> fdroid-report.txt
+          echo "=== BUILD INFO ===" >> fdroid-report.txt
+          echo "Git commit: $(git rev-parse HEAD)" >> fdroid-report.txt
+          echo "Build date: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> fdroid-report.txt
+
+      # 9. List final artifacts for F-Droid (prod release unsigned is what F-Droid builds)
+      - name: 9. Prepare F-Droid artifacts
+        run: |
+          mkdir -p final-fdroid
+          cp out-fdroid/apk/prod/release/*.apk final-fdroid/
+          cp out-fdroid/apk/prod/debug/*.apk final-fdroid/ 2>/dev/null || true
+          cp fdroid-report.txt final-fdroid/
+          ls -lh final-fdroid/
+
+      # 10. Upload artifacts for comparison
+      - name: 10. Upload F-Droid check artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fdroid-reproducible-build
+          path: |
+            final-fdroid/*.apk
+            final-fdroid/fdroid-report.txt
+          retention-days: 30
