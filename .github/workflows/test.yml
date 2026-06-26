@@ -6,22 +6,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v5
-        with:
-          ref: main
-          fetch-depth: 0
+      - uses: actions/checkout@v5
+        with: { ref: main, fetch-depth: 0 }
 
-      - name: Setup JDK 17 for Android SDK
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: '17' }
 
-      - name: Setup Android SDK 34
-        uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
@@ -33,22 +25,22 @@ jobs:
           sed -i 's|COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk/\*/release/bitcoin-wallet-\*-release-unsigned.apk /|COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk/*/*/*.apk /|' build.Containerfile
 
       - name: Install buildah
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y buildah fuse-overlayfs
+        run: sudo apt-get update && sudo apt-get install -y buildah fuse-overlayfs
 
       - name: Build APKs via Containerfile
         run: |
           mkdir -p out
-          sudo buildah build --cap-add SYS_ADMIN --device /dev/fuse --file build.Containerfile --output out .
+          sudo buildah bud --cap-add SYS_ADMIN --device /dev/fuse -f build.Containerfile --target export-stage -t wallet-export .
+          ctr=$(sudo buildah from wallet-export)
+          mnt=$(sudo buildah mount $ctr)
+          sudo cp $mnt/*.apk out/
+          sudo buildah umount $ctr
+          sudo buildah rm $ctr
           ls -lh out
 
       - name: Prepare folders
         run: |
-          mkdir -p wallet/build/outputs/apk/dev/debug
-          mkdir -p wallet/build/outputs/apk/dev/release
-          mkdir -p wallet/build/outputs/apk/prod/debug
-          mkdir -p wallet/build/outputs/apk/prod/release
+          mkdir -p wallet/build/outputs/apk/dev/{debug,release} wallet/build/outputs/apk/prod/{debug,release}
           cp out/*dev*debug*.apk wallet/build/outputs/apk/dev/debug/
           cp out/*dev*release*.apk wallet/build/outputs/apk/dev/release/
           cp out/*prod*debug*.apk wallet/build/outputs/apk/prod/debug/
