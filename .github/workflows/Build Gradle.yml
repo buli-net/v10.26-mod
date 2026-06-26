@@ -1,15 +1,15 @@
 # =================================================================
-# FILE: .github/workflows/Build APK Full.yml
-# MỤC ĐÍCH:
-#   - Build 4 biến thể APK theo đúng cấu hình trong build.gradle:
-#       1. devDebug   (dành cho phát triển, có thể gỡ lỗi)
-#       2. devRelease (bản release thật trên môi trường dev, đã tối ưu)
-#       3. prodDebug  (debug dùng tài nguyên production)
-#       4. prodRelease (bản release chính thức, tối ưu và ký)
-#   - Ký các bản release (devRelease, prodRelease) bằng keystore riêng
-#   - Xác minh bản release không còn flag debuggable
-#   - Upload toàn bộ 4 APK lên GitHub Artifact
-# BẢN FIX 2026-06-21: nâng Node 24 + bật cache + giữ nguyên logic ký
+# FILE: .github/workflows/build-apk-full.yml
+# PURPOSE:
+#   - Build 4 APK variants exactly as defined in build.gradle:
+#       1. devDebug   (development, debuggable)
+#       2. devRelease (optimized dev release)
+#       3. prodDebug  (debug with prod resources)
+#       4. prodRelease (official production release)
+#   - Sign release APKs with keystore
+#   - Verify signatures, metadata, and fingerprints
+#   - Upload all 4 APKs to GitHub Artifacts
+# UPDATED 2026-06-26: Node 24 actions + full verification like Docker build
 # =================================================================
 
 name: Build Bitcoin Wallet - All Real Variants - Full APK
@@ -22,43 +22,56 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # ----- BƯỚC 1: Lấy mã nguồn -----
-      - name: Checkout source code
-        uses: actions/checkout@v5          # FIX: v5 = Node 24 (hết warning)
+      # ----- STEP 0: Runner info -----
+      - name: 0. Print runner info
+        run: |
+          echo "=== RUNNER INFO ==="
+          uname -a
+          date -u
+          echo "GitHub SHA: $GITHUB_SHA"
+
+      # ----- STEP 1: Checkout source -----
+      - name: 1. Checkout source code
+        uses: actions/checkout@v5.0.0
         with:
           ref: main
           fetch-depth: 0
 
-      # ----- BƯỚC 2: JDK 17 cho Android SDK -----
-      - name: Setup JDK 17 for Android SDK
-        uses: actions/setup-java@v5       # FIX: v5 = Node 24
+      - name: 1b. Verify commit
+        run: |
+          echo "=== SOURCE VERIFICATION ==="
+          git log -1 --pretty=full
+          git rev-parse HEAD > commit.txt
+
+      # ----- STEP 2: Setup JDK 17 for Android SDK tools -----
+      - name: 2. Setup JDK 17 for SDK
+        uses: actions/setup-java@v5.0.0
         with:
           distribution: temurin
           java-version: '17'
 
-      # ----- BƯỚC 3: Android SDK 34 -----
-      - name: Setup Android SDK 34
-        uses: android-actions/setup-android@v4   # FIX: v4 = Node 24
+      # ----- STEP 3: Setup Android SDK 34 -----
+      - name: 3. Setup Android SDK 34
+        uses: android-actions/setup-android@v4.0.0
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
-      # ----- BƯỚC 4: JDK 11 để build -----
-      - name: Setup JDK 11 for build
-        uses: actions/setup-java@v5       # FIX: v5
+      # ----- STEP 4: Setup JDK 11 for Gradle build -----
+      - name: 4. Setup JDK 11 for build
+        uses: actions/setup-java@v5.0.0
         with:
           distribution: temurin
           java-version: '11'
-          # KHÔNG thêm cache: gradle -> để setup-gradle quản lý
 
-      # ----- BƯỚC 5: Gradle 6.9.4 + CACHE -----
-      - name: Setup Gradle 6.9.4
-        uses: gradle/actions/setup-gradle@v5   # FIX: v5 = Node 24
+      # ----- STEP 5: Setup Gradle 6.9.4 with cache -----
+      - name: 5. Setup Gradle 6.9.4
+        uses: gradle/actions/setup-gradle@v5.0.0
         with:
           gradle-version: '6.9.4'
-          cache-disabled: false   # bật cache (sẽ restore 159MB như bản debug)
+          cache-disabled: false
 
-      # ----- BƯỚC 6: Ép phiên bản thư viện -----
-      - name: Force library versions for Gradle 6
+      # ----- STEP 6: Force library versions for Gradle 6 compatibility -----
+      - name: 6. Force library versions
         run: |
           mkdir -p ~/.gradle/init.d
           cat > ~/.gradle/init.d/force.gradle <<'EOF'
@@ -84,8 +97,8 @@ jobs:
           }
           EOF
 
-      # ----- BƯỚC 7: Build 4 biến thể -----
-      - name: Build all APK variants
+      # ----- STEP 7: Build all 4 variants -----
+      - name: 7. Build all APK variants
         run: |
           export ANDROID_HOME=$ANDROID_SDK_ROOT
           export JAVA_HOME=$JAVA_HOME_11_X64
@@ -95,77 +108,107 @@ jobs:
                   :wallet:assembleProdRelease \
                   --no-daemon -Pandroid.buildToolsVersion=34.0.0 --stacktrace
 
-      # ----- BƯỚC 8: Giải mã keystore -----
-      - name: Decode Keystore
+      # ----- STEP 8: Decode keystore -----
+      - name: 8. Decode keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+          echo "=== KEYSTORE INFO ==="
+          keytool -list -v -keystore keystore.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -alias "${{ secrets.KEY_ALIAS }}" | tee keystore-info.txt
 
-      # ----- BƯỚC 9: Ký devRelease -----
-      - name: Sign devRelease APK
+      # ----- STEP 9: Find build tools dynamically -----
+      - name: 9. Find apksigner and aapt
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+          AAPT=$(dirname "$APKSIGNER")/aapt
+          if [ ! -x "$AAPT" ]; then AAPT=$(dirname "$APKSIGNER")/aapt2; fi
+          echo "APKSIGNER=$APKSIGNER" >> $GITHUB_ENV
+          echo "AAPT=$AAPT" >> $GITHUB_ENV
+          echo "Using apksigner: $APKSIGNER"
+          echo "Using aapt: $AAPT"
+
+      # ----- STEP 10: Sign devRelease -----
+      - name: 10. Sign devRelease APK
         run: |
           APK_PATH=$(find wallet/build/outputs/apk/dev/release -name "*.apk" | head -1)
-          $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
-            --ks keystore.jks \
-            --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
-            --ks-key-alias ${{ secrets.KEY_ALIAS }} \
-            --key-pass pass:${{ secrets.KEY_PASSWORD }} \
-            "$APK_PATH"
+          "$APKSIGNER" sign --ks keystore.jks --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} --ks-key-alias ${{ secrets.KEY_ALIAS }} --key-pass pass:${{ secrets.KEY_PASSWORD }} "$APK_PATH"
 
-      # ----- BƯỚC 10: Ký prodRelease -----
-      - name: Sign prodRelease APK
+      # ----- STEP 11: Sign prodRelease -----
+      - name: 11. Sign prodRelease APK
         run: |
           APK_PATH=$(find wallet/build/outputs/apk/prod/release -name "*.apk" | head -1)
-          $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
-            --ks keystore.jks \
-            --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
-            --ks-key-alias ${{ secrets.KEY_ALIAS }} \
-            --key-pass pass:${{ secrets.KEY_PASSWORD }} \
-            "$APK_PATH"
+          "$APKSIGNER" sign --ks keystore.jks --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} --ks-key-alias ${{ secrets.KEY_ALIAS }} --key-pass pass:${{ secrets.KEY_PASSWORD }} "$APK_PATH"
 
-      # ----- BƯỚC 11: Xác minh chữ ký -----
-      - name: Verify signatures of release APKs
+      # ----- STEP 12: Verify signatures -----
+      - name: 12. Verify signatures
         run: |
           for variant in dev/release prod/release; do
             APK_PATH=$(find wallet/build/outputs/apk/${variant} -name "*.apk" | head -1)
-            echo "Verifying $APK_PATH"
-            $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose --print-certs "$APK_PATH"
+            echo "===== VERIFYING $APK_PATH ====="
+            "$APKSIGNER" verify --verbose --print-certs "$APK_PATH"
           done
 
-      # ----- BƯỚC 12: Đảm bảo release không debuggable -----
-      - name: Ensure release APKs are not debuggable
+      # ----- STEP 13: Dump APK metadata -----
+      - name: 13. Dump APK info
         run: |
-          APK_PROD_REL=$(find wallet/build/outputs/apk/prod/release -name "*.apk" | head -1)
-          if aapt dump badging "$APK_PROD_REL" | grep -q 'debuggable="true"'; then
-            echo "❌ ERROR: prodRelease.apk vẫn còn debuggable!"
-            exit 1
-          else
-            echo "✅ prodRelease.apk là bản release thật (không debuggable)."
-          fi
+          echo "=== APK METADATA ==="
+          for apk in wallet/build/outputs/apk/*/*/*.apk; do
+            echo "--- $(basename $apk) ---"
+            "$AAPT" dump badging "$apk" | grep -E "package:|versionName|versionCode|sdkVersion|application-debuggable"
+          done
+
+      # ----- STEP 14: Ensure releases are not debuggable -----
+      - name: 14. Check debuggable flag
+        run: |
+          for apk in wallet/build/outputs/apk/dev/release/*.apk wallet/build/outputs/apk/prod/release/*.apk; do
+            if "$AAPT" dump badging "$apk" | grep -q 'application-debuggable'; then
+              echo "❌ ERROR: $(basename $apk) is still debuggable!"
+              exit 1
+            else
+              echo "✅ $(basename $apk) is a proper release (not debuggable)"
+            fi
+          done
+
+      # ----- STEP 15: Authenticity check -----
+      - name: 15. Fingerprint check
+        env:
+          EXPECTED_SHA256: ${{ secrets.EXPECTED_CERT_SHA256 }}
+        run: |
+          echo "=== FINGERPRINT CHECK ==="
+          for apk in wallet/build/outputs/apk/*/*release/*.apk; do
+            ACTUAL=$("$APKSIGNER" verify --print-certs "$apk" | grep SHA-256 | awk '{print $NF}')
+            echo "$(basename $apk): $ACTUAL"
+            if [ -n "$EXPECTED_SHA256" ] && [ "$ACTUAL" != "$EXPECTED_SHA256" ]; then
+              echo "❌ MISMATCH"
+              exit 1
+            fi
+          done
+
+      # ----- STEP 16: Rename APKs -----
+      - name: 16. Rename APKs
+        run: |
+          mkdir -p final
+          cp wallet/build/outputs/apk/dev/debug/*.apk final/bitcoin-wallet-dev-debug.apk
+          cp wallet/build/outputs/apk/dev/release/*.apk final/bitcoin-wallet-dev-release-signed.apk
+          cp wallet/build/outputs/apk/prod/debug/*.apk final/bitcoin-wallet-prod-debug.apk
+          cp wallet/build/outputs/apk/prod/release/*.apk final/bitcoin-wallet-prod-release-signed.apk
           
-          APK_DEV_REL=$(find wallet/build/outputs/apk/dev/release -name "*.apk" | head -1)
-          if aapt dump badging "$APK_DEV_REL" | grep -q 'debuggable="true"'; then
-            echo "❌ ERROR: devRelease.apk vẫn còn debuggable!"
-            exit 1
-          else
-            echo "✅ devRelease.apk là bản release thật."
-          fi
+          {
+            echo "===== BITCOIN WALLET BUILD REPORT (GRADLE) ====="
+            echo "Build time (UTC): $(date -u)"
+            echo "Git commit: $(cat commit.txt)"
+            echo ""
+            echo "--- SHA256 CHECKSUMS ---"
+            sha256sum final/*.apk
+          } > final/report.txt
+          ls -lh final
 
-      # ----- BƯỚC 13: Đổi tên APK -----
-      - name: Rename APKs
-        run: |
-          mkdir -p wallet/build/outputs/apk/final
-          cp wallet/build/outputs/apk/dev/debug/*.apk      wallet/build/outputs/apk/final/bitcoin-wallet-dev-debug.apk
-          cp wallet/build/outputs/apk/dev/release/*.apk   wallet/build/outputs/apk/final/bitcoin-wallet-dev-release-signed.apk
-          cp wallet/build/outputs/apk/prod/debug/*.apk     wallet/build/outputs/apk/final/bitcoin-wallet-prod-debug.apk
-          cp wallet/build/outputs/apk/prod/release/*.apk  wallet/build/outputs/apk/final/bitcoin-wallet-prod-release-signed.apk
-          rm -rf wallet/build/outputs/apk/dev wallet/build/outputs/apk/prod
-          mv wallet/build/outputs/apk/final/* wallet/build/outputs/apk/
-          rmdir wallet/build/outputs/apk/final
-
-      # ----- BƯỚC 14: Upload 4 APK -----
-      - name: Upload all APKs
-        uses: actions/upload-artifact@v6   # FIX: v6 = Node 24
+      # ----- STEP 17: Upload artifacts -----
+      - name: 17. Upload all APKs
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: bitcoin-wallet-all-variants
-          path: wallet/build/outputs/apk/*.apk
-          retention-days: 90   # thêm để giữ lâu hơn
+          path: |
+            final/*.apk
+            final/report.txt
+            keystore-info.txt
+          retention-days: 90
