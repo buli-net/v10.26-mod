@@ -1,31 +1,27 @@
 FROM debian:bullseye-slim AS build-stage
 ENV DEBIAN_FRONTEND=noninteractive
 
+# bullseye is EOL -> use archive.debian.org
 RUN echo 'deb http://archive.debian.org/debian bullseye main' > /etc/apt/sources.list && \
+    echo 'deb http://archive.debian.org/debian bullseye-backports main' >> /etc/apt/sources.list && \
     echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check
 
 RUN apt-get update && \
-    apt-get -y install --no-install-recommends disorderfs openjdk-11-jdk-headless gradle wget unzip && \
+    apt-get --yes --no-install-recommends install disorderfs openjdk-11-jdk-headless gradle sdkmanager && \
     ln -fs /usr/share/zoneinfo/CET /etc/localtime && \
-    dpkg-reconfigure -f noninteractive tzdata && \
+    dpkg-reconfigure --frontend noninteractive tzdata && \
     ln -s /proc/self/mounts /etc/mtab && \
     adduser --disabled-login --gecos "" builder
 
 USER builder
 WORKDIR /home/builder
-ENV ANDROID_HOME=/home/builder/android-sdk
-ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-
 COPY --chown=builder / project/
+ENV ANDROID_HOME=/home/builder/android-sdk
 
-RUN mkdir -p $ANDROID_HOME/cmdline-tools && \
-    wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O /tmp/tools.zip && \
-    unzip -q /tmp/tools.zip -d $ANDROID_HOME/cmdline-tools && \
-    mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest && \
-    rm /tmp/tools.zip && \
-    yes | sdkmanager --licenses > /dev/null && \
-    sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" > /dev/null && \
-    cd project && gradle --no-build-cache --no-daemon clean :wallet:assembleDevDebug :wallet:assembleDevRelease :wallet:assembleProdDebug :wallet:assembleProdRelease
+RUN yes | sdkmanager --licenses >/dev/null && \
+    if [ -e /dev/fuse ]; then mv project project.u && mkdir project && disorderfs --sort-dirents=yes --reverse-dirents=no project.u project; fi && \
+    gradle --project-dir project/ --no-build-cache --no-daemon --no-parallel clean :wallet:assembleDevDebug :wallet:assembleDevRelease :wallet:assembleProdDebug :wallet:assembleProdRelease && \
+    if [ -e /dev/fuse ]; then fusermount -u project || true && rmdir project && mv project.u project; fi
 
 FROM scratch AS export-stage
 COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk /apk
