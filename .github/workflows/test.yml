@@ -1,27 +1,41 @@
-name: Build v10.26
+name: Build Bitcoin Wallet v10.26
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # chạy tay từ tab Actions
+  push:
+    paths:
+      - 'build.Containerfile'
+      - '.github/workflows/build.yml'
 
 jobs:
   build:
     runs-on: ubuntu-24.04
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Patch Containerfile (fix 404 bullseye-backports)
-        run: sed -i 's|bullseye-backports|bookworm-slim|' build.Containerfile
-
-      - name: Cài buildah
-        run: sudo apt-get update && sudo apt-get install -y buildah fuse-overlayfs
-
-      - name: Build
+      - name: Cài buildah + fuse
         run: |
-          mkdir out
-          sudo buildah build --cap-add SYS_ADMIN --device /dev/fuse \
-            --file build.Containerfile --output out .
+          sudo apt-get update
+          sudo apt-get install -y buildah fuse-overlayfs
 
-      - uses: actions/upload-artifact@v4
+      - name: Build APK (reproducible)
+        run: |
+          mkdir -p out
+          sudo buildah build \
+            --cap-add SYS_ADMIN \
+            --device /dev/fuse \
+            --file build.Containerfile \
+            --output out \
+            .
+
+      - name: Liệt kê kết quả
+        run: ls -lh out
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          name: v10.26
+          name: bitcoin-wallet-v10.26-unsigned
           path: out/*.apk
+          retention-days: 7
