@@ -9,7 +9,7 @@ jobs:
     steps:
       # 0. Checkout source code
       - name: 0. Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v5.0.0
         with:
           ref: main
           fetch-depth: 0
@@ -24,14 +24,14 @@ jobs:
 
       # 2. Install JDK 17 (only for apksigner, build uses JDK11 inside container)
       - name: 2. Setup JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v5.0.0
         with:
           distribution: temurin
           java-version: '17'
 
       # 3. Install Android SDK with build-tools 34
       - name: 3. Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v4.0.0
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
@@ -163,9 +163,9 @@ jobs:
           
           ls -lh final
 
-      # 15. Upload artifacts (fixed: v6 does not exist, use v4)
+      # 15. Upload artifacts - PINNED to v4.6.2 (Node 24)
       - name: 15. Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: bitcoin-wallet-all-variants
           path: |
