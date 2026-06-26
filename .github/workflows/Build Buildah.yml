@@ -163,9 +163,9 @@ jobs:
           
           ls -lh final
 
-      # 15. Upload artifacts - PINNED to v4.6.2 (Node 24)
+      # 15. Upload artifacts - UPDATED to v6.0.0 (Node 24 native)
       - name: 15. Upload artifacts
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: bitcoin-wallet-all-variants
           path: |
