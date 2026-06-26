@@ -1,25 +1,16 @@
 #
-# Reproducible reference build
+# Reproducible reference build - fixed for 2026
 #
-# Usage:
-#
-# docker build --file build.Containerfile --output <outputdir> .
-# or
-# podman build --file build.Containerfile --output <outputdir> .
-#
-# For improved reproducibility, the project directory entries can be ordered
-# like this:
-#
-# buildah build --cap-add sys_admin --device /dev/fuse --file build.Containerfile --output <outputdir> .
-#
-# In any case, the unsigned APKs are written to the specified output
-# directory. Use `apksigner` to sign before installing via `adb install`.
-#
+FROM debian:bullseye-slim AS build-stage
 
-FROM debian:bullseye-backports AS build-stage
+# bullseye đã EOL, dùng archive
+ENV DEBIAN_FRONTEND=noninteractive
+RUN echo 'deb http://archive.debian.org/debian bullseye main' > /etc/apt/sources.list && \
+    echo 'deb http://archive.debian.org/debian-security bullseye-security main' >> /etc/apt/sources.list && \
+    echo 'deb http://archive.debian.org/debian bullseye-backports main' >> /etc/apt/sources.list && \
+    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check
 
 # install debian packages
-ENV DEBIAN_FRONTEND noninteractive
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
     /bin/rm -f /etc/apt/apt.conf.d/docker-clean && \
