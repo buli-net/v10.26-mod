@@ -1,28 +1,66 @@
-FROM debian:bullseye-slim AS build-stage
-ENV DEBIAN_FRONTEND=noninteractive
+name: Build Bitcoin Wallet - Docker bullseye
 
-# bullseye EOL -> chỉ dùng archive main
-RUN echo 'deb http://archive.debian.org/debian bullseye main' > /etc/apt/sources.list && \
-    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check
+on:
+  workflow_dispatch:
 
-RUN apt-get update && \
-    apt-get -y install disorderfs openjdk-11-jdk-headless gradle sdkmanager && \
-    ln -fs /usr/share/zoneinfo/CET /etc/localtime && \
-    dpkg-reconfigure -f noninteractive tzdata && \
-    ln -s /proc/self/mounts /etc/mtab && \
-    adduser --disabled-login --gecos "" builder
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
 
-USER builder
-WORKDIR /home/builder
-COPY --chown=builder / project/
+      - name: Setup JDK 17 for apksigner
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
 
-ENV ANDROID_HOME=/home/builder/android-sdk
-RUN yes | sdkmanager --licenses >/dev/null
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
-RUN --mount=target=/home/builder/android-sdk,type=cache,uid=1000 \
-    --mount=target=/home/builder/.gradle,type=cache,uid=1000 \
-    cd project && gradle --no-build-cache --no-daemon clean :wallet:assembleRelease
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-FROM scratch AS export-stage
-COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk/dev/release/*.apk /
-COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk/prod/release/*.apk /
+      - name: Build APKs with Containerfile
+        run: |
+          mkdir -p out
+          DOCKER_BUILDKIT=1 docker build \
+            -f build.Containerfile \
+            --target export-stage \
+            --output type=local,dest=out \
+            .
+          echo "=== APKs built ==="
+          ls -lh out
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+
+      - name: Sign APKs
+        run: |
+          for apk in out/*.apk; do
+            echo "Signing $apk"
+            $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
+              --ks keystore.jks \
+              --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
+              --ks-key-alias ${{ secrets.KEY_ALIAS }} \
+              --key-pass pass:${{ secrets.KEY_PASSWORD }} \
+              --out "${apk%.apk}-signed.apk" "$apk"
+          done
+          ls -lh out
+
+      - name: Verify signatures
+        run: |
+          for apk in out/*-signed.apk; do
+            echo "=== $apk ==="
+            $ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs "$apk"
+          done
+
+      - name: Upload signed APKs
+        uses: actions/upload-artifact@v6
+        with:
+          name: bitcoin-wallet-10.26-release
+          path: out/*-signed.apk
+          retention-days: 90
