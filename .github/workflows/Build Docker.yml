@@ -1,4 +1,4 @@
-name: Build Bitcoin Wallet - Full Verify
+name: Build Bitcoin Wallet - Docker - Full Verify
 # Builds Bitcoin Wallet 10.26 from source using the original Debian bullseye container,
 # signs the release APKs, keeps debug APKs, and prints full verification info.
 # Updated to actions that run on Node.js 24 (no more deprecation warning).
