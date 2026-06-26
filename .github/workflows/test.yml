@@ -1,4 +1,4 @@
-name: Build Bitcoin Wallet - All Real Variants - Container
+name: Build Bitcoin Wallet - Containerfile.buildah
 
 on:
   workflow_dispatch:
@@ -17,34 +17,32 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
-      - name: Patch build.Containerfile
-        run: |
-          sed -i 's|FROM debian:bullseye-backports|FROM debian:bullseye-slim|' build.Containerfile
-          sed -i '/ENV DEBIAN_FRONTEND/a RUN echo '\''deb http://archive.debian.org/debian bullseye main'\'' > /etc/apt/sources.list && echo '\''deb http://archive.debian.org/debian bullseye-backports main'\'' >> /etc/apt/sources.list && echo '\''Acquire::Check-Valid-Until "false";'\'' > /etc/apt/apt.conf.d/99no-check' build.Containerfile
-          sed -i 's|:wallet:assembleRelease|:wallet:assembleDevDebug :wallet:assembleDevRelease :wallet:assembleProdDebug :wallet:assembleProdRelease|' build.Containerfile
-          sed -i 's|COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk/\*/release/bitcoin-wallet-\*-release-unsigned.apk /|COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk/*/*/*.apk /|' build.Containerfile
-
       - name: Install buildah
         run: sudo apt-get update && sudo apt-get install -y buildah fuse-overlayfs
 
-      - name: Build APKs via Containerfile
+      - name: Build with build.Containerfile.buildah
         run: |
           mkdir -p out
-          sudo buildah bud --cap-add SYS_ADMIN --device /dev/fuse -f build.Containerfile --target export-stage -t wallet-export .
+          sudo buildah bud \
+            --cap-add SYS_ADMIN \
+            --device /dev/fuse \
+            -f build.Containerfile.buildah \
+            --target export-stage \
+            -t wallet-export .
+          
           ctr=$(sudo buildah from wallet-export)
           mnt=$(sudo buildah mount $ctr)
           sudo cp $mnt/*.apk out/
           sudo buildah umount $ctr
-          sudo buildah rm $ctr
           ls -lh out
 
       - name: Prepare folders
         run: |
           mkdir -p wallet/build/outputs/apk/dev/{debug,release} wallet/build/outputs/apk/prod/{debug,release}
-          cp out/*dev*debug*.apk wallet/build/outputs/apk/dev/debug/
-          cp out/*dev*release*.apk wallet/build/outputs/apk/dev/release/
-          cp out/*prod*debug*.apk wallet/build/outputs/apk/prod/debug/
-          cp out/*prod*release*.apk wallet/build/outputs/apk/prod/release/
+          cp out/*dev*debug*.apk wallet/build/outputs/apk/dev/debug/bitcoin-wallet-dev-debug.apk
+          cp out/*dev*release*.apk wallet/build/outputs/apk/dev/release/bitcoin-wallet-dev-release-unsigned.apk
+          cp out/*prod*debug*.apk wallet/build/outputs/apk/prod/debug/bitcoin-wallet-prod-debug.apk
+          cp out/*prod*release*.apk wallet/build/outputs/apk/prod/release/bitcoin-wallet-prod-release-unsigned.apk
 
       - name: Decode Keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
@@ -64,7 +62,7 @@ jobs:
           $ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs wallet/build/outputs/apk/dev/release/*.apk
           $ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs wallet/build/outputs/apk/prod/release/*.apk
 
-      - name: Rename and upload
+      - name: Final APKs
         run: |
           mkdir final
           mv wallet/build/outputs/apk/dev/debug/*.apk final/bitcoin-wallet-dev-debug.apk
@@ -72,7 +70,7 @@ jobs:
           mv wallet/build/outputs/apk/prod/debug/*.apk final/bitcoin-wallet-prod-debug.apk
           mv wallet/build/outputs/apk/prod/release/*.apk final/bitcoin-wallet-prod-release-signed.apk
 
-      - name: Upload APKs
+      - name: Upload
         uses: actions/upload-artifact@v6
         with:
           name: bitcoin-wallet-all-variants
