@@ -1,101 +1,39 @@
-name: Build Bitcoin Wallet - Docker - Full Verify
-# Builds Bitcoin Wallet 10.26 from source using the original Debian bullseye container,
-# signs the release APKs, keeps debug APKs, and prints full verification info.
-# All actions pinned to Node.js 24 runtimes (no deprecation warnings).
+FROM debian:bullseye-slim AS build-stage
+ENV DEBIAN_FRONTEND=noninteractive
 
-on:
-  workflow_dispatch:
+RUN echo 'deb http://archive.debian.org/debian bullseye main' > /etc/apt/sources.list && \
+    mkdir -p /etc/apt/apt.conf.d && \
+    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: 0. Print runner info
-        run: |
-          echo "=== RUNNER INFO ==="
-          uname -a
-          date -u
-          echo "GitHub SHA: $GITHUB_SHA"
+RUN apt-get update && \
+    apt-get -y install --no-install-recommends disorderfs openjdk-11-jdk-headless gradle wget unzip && \
+    ln -fs /usr/share/zoneinfo/CET /etc/localtime && \
+    dpkg-reconfigure -f noninteractive tzdata && \
+    ln -s /proc/self/mounts /etc/mtab && \
+    adduser --disabled-login --gecos "" builder
 
-      - name: 1. Checkout source
-        uses: actions/checkout@v5.0.0
-        with:
-          fetch-depth: 0
+USER builder
+WORKDIR /home/builder
+ENV ANDROID_HOME=/home/builder/android-sdk
+ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
 
-      - name: 1b. Verify commit
-        run: |
-          echo "=== SOURCE VERIFICATION ==="
-          git log -1 --pretty=full
-          git rev-parse HEAD > commit.txt
+WORKDIR /home/builder
+COPY --chown=builder / project/
 
-      - name: 2. Setup JDK 17 for apksigner
-        uses: actions/setup-java@v5.0.0
-        with:
-          distribution: temurin
-          java-version: '17'
+# Tải SDK + build trong cùng 1 RUN, dùng cache
+RUN --mount=target=/home/builder/android-sdk,type=cache,uid=1000 \
+    --mount=target=/home/builder/.gradle,type=cache,uid=1000 \
+    mkdir -p $ANDROID_HOME/cmdline-tools && \
+    if [ ! -x $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager ]; then \
+      wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O /tmp/tools.zip && \
+      unzip -q /tmp/tools.zip -d $ANDROID_HOME/cmdline-tools && \
+      mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest && \
+      rm /tmp/tools.zip ; \
+    fi && \
+    yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null && \
+    $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;35.0.0" > /dev/null && \
+    cd project && gradle --no-build-cache --no-daemon clean :wallet:assembleRelease
 
-      - name: 3. Setup Android SDK
-        uses: android-actions/setup-android@v4.0.0
-
-      - name: 4. Setup Docker Buildx (Node24)
-        uses: docker/setup-buildx-action@v4.0.0
-
-      - name: 5. Build APKs with Docker
-        run: |
-          mkdir -p out
-          DOCKER_BUILDKIT=1 docker build -f build.Containerfile --target export-stage --output type=local,dest=out .
-          ls -lh out/
-          sha256sum out/*.apk | tee out/raw-sha256.txt
-
-      - name: 6. Decode keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
-          keytool -list -v -keystore keystore.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -alias "${{ secrets.KEY_ALIAS }}" | tee keystore-info.txt
-
-      - name: 7. Find apksigner
-        run: |
-          APK=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
-          echo "APKSIGNER=$APK" >> $GITHUB_ENV
-          echo "Using apksigner: $APK"
-
-      - name: 8. Sign release APKs
-        run: |
-          set -e
-          shopt -s nullglob
-          for apk in out/*release*.apk; do
-            base=$(basename "$apk")
-            clean=$(echo "$base" | sed 's/-unsigned//' | sed 's/\.apk$//')
-            outname="${clean}-signed.apk"
-            echo "Signing $base -> $outname"
-            "$APKSIGNER" sign --ks keystore.jks --ks-pass pass:"${{ secrets.KEYSTORE_PASSWORD }}" --ks-key-alias "${{ secrets.KEY_ALIAS }}" --key-pass pass:"${{ secrets.KEY_PASSWORD }}" --out "out/$outname" "$apk"
-          done
-          rm -f out/*release-unsigned.apk out/*release.apk 2>/dev/null || true
-          ls -lh out/
-
-      - name: 9. Verify signatures
-        run: |
-          for apk in out/*-signed.apk; do
-            echo "===== VERIFYING $(basename $apk) ====="
-            "$APKSIGNER" verify --verbose --print-certs "$apk"
-          done
-
-      - name: 10. Generate report
-        run: |
-          {
-            echo "===== BITCOIN WALLET BUILD REPORT ====="
-            echo "Build time (UTC): $(date -u)"
-            echo "Git commit: $(cat commit.txt)"
-            echo ""
-            echo "--- SHA256 CHECKSUMS ---"
-            sha256sum out/*.apk
-          } > report.txt
-
-      - name: 11. Upload artifacts (Node24)
-        uses: actions/upload-artifact@v6.0.0
-        with:
-          name: bitcoin-wallet-verified
-          path: |
-            out/*.apk
-            out/*.txt
-            report.txt
-            keystore-info.txt
+FROM scratch AS export-stage
+COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk/dev/release/*.apk /
+COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk/prod/release/*.apk /
