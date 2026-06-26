@@ -1,0 +1,39 @@
+name: Build v10.26 with Buildah
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout tag v10.26
+        uses: actions/checkout@v4
+        with:
+          repository: bitcoin-wallet/bitcoin-wallet
+          ref: v10.26
+          fetch-depth: 1
+
+      - name: Install Buildah + Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y buildah fuse-overlayfs
+
+      - name: Build APK (reproducible)
+        run: |
+          mkdir -p build-output
+          sudo buildah build \
+            --cap-add SYS_ADMIN \
+            --device /dev/fuse \
+            --file build.Containerfile \
+            --output build-output \
+           .
+
+      - name: List result
+        run: ls -lh build-output
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitcoin-wallet-v10.26-apks
+          path: build-output/*.apk
