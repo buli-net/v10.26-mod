@@ -1,7 +1,7 @@
 name: Build Bitcoin Wallet - Docker - Full Verify
 # Builds Bitcoin Wallet 10.26 from source using the original Debian bullseye container,
 # signs the release APKs, keeps debug APKs, and prints full verification info.
-# Updated to actions that run on Node.js 24 (no more deprecation warning).
+# Updated to actions that run on Node.js 24 (no deprecation warning).
 
 on:
   workflow_dispatch:  # manual trigger from Actions tab
@@ -21,7 +21,7 @@ jobs:
           echo "GitHub SHA: $GITHUB_SHA"
 
       # ------------------------------------------------------------------
-      # 1. Checkout source - uses v5 (Node 24 support)
+      # 1. Checkout source - uses v5.0.0 (Node 24 support)
       # ------------------------------------------------------------------
       - uses: actions/checkout@v5.0.0
         with:
@@ -34,7 +34,7 @@ jobs:
           git rev-parse HEAD > commit.txt
 
       # ------------------------------------------------------------------
-      # 2. Install JDK 17 - uses setup-java@v5 (Node 24)
+      # 2. Install JDK 17 - uses setup-java@v5.0.0 (Node 24)
       #    JDK17 is only for apksigner, NOT for building (build uses JDK11 in Docker)
       # ------------------------------------------------------------------
       - uses: actions/setup-java@v5.0.0
@@ -43,14 +43,14 @@ jobs:
           java-version: '17'
 
       # ------------------------------------------------------------------
-      # 3. Install Android SDK - uses setup-android@v4 (Node 24 fix)
+      # 3. Install Android SDK - uses setup-android@v4.0.0 (Node 24)
       # ------------------------------------------------------------------
       - uses: android-actions/setup-android@v4.0.0
 
       # ------------------------------------------------------------------
-      # 4. Install Docker Buildx - v3.11.1+ supports Node 24
+      # 4. Install Docker Buildx - v4.0.0 runs on Node 24 natively
       # ------------------------------------------------------------------
-      - uses: docker/setup-buildx-action@v3.11.1
+      - uses: docker/setup-buildx-action@v4.0.0
 
       # ------------------------------------------------------------------
       # 5. Build 4 APKs inside Docker (keeps original build standard)
@@ -206,10 +206,10 @@ jobs:
           } | tee report.txt
 
       # ------------------------------------------------------------------
-      # 13. Upload artifacts - uses upload-artifact@v4.6.2 (Node 24 compatible)
+      # 13. Upload artifacts - uses upload-artifact@v6.0.0 (Node 24 native)
       # ------------------------------------------------------------------
       - name: 10. Upload artifacts
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: bitcoin-wallet-verified
           path: |
