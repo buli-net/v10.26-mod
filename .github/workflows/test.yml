@@ -1,4 +1,4 @@
-name: Build v10.26 with Buildah
+name: Build v10.26
 
 on:
   workflow_dispatch:
@@ -7,33 +7,21 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout tag v10.26
-        uses: actions/checkout@v4
-        with:
-          repository: bitcoin-wallet/bitcoin-wallet
-          ref: v10.26
-          fetch-depth: 1
+      - uses: actions/checkout@v4
 
-      - name: Install Buildah + Podman
+      - name: Patch Containerfile (fix 404 bullseye-backports)
+        run: sed -i 's|bullseye-backports|bookworm-slim|' build.Containerfile
+
+      - name: Cài buildah
+        run: sudo apt-get update && sudo apt-get install -y buildah fuse-overlayfs
+
+      - name: Build
         run: |
-          sudo apt-get update
-          sudo apt-get install -y buildah fuse-overlayfs
+          mkdir out
+          sudo buildah build --cap-add SYS_ADMIN --device /dev/fuse \
+            --file build.Containerfile --output out .
 
-      - name: Build APK (reproducible)
-        run: |
-          mkdir -p build-output
-          sudo buildah build \
-            --cap-add SYS_ADMIN \
-            --device /dev/fuse \
-            --file build.Containerfile \
-            --output build-output \
-           .
-
-      - name: List result
-        run: ls -lh build-output
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: bitcoin-wallet-v10.26-apks
-          path: build-output/*.apk
+          name: v10.26
+          path: out/*.apk
