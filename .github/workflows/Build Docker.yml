@@ -5,25 +5,28 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
+      # 1. Lấy code
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
+      # 2. JDK17 cho apksigner
       - name: Setup JDK 17 for apksigner
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+      # 3. Android SDK
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
-        with:
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+        uses: android-actions/setup-android@v3
 
+      # 4. Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # 5. Build 4 APK
       - name: Build APKs with Containerfile
         run: |
           mkdir -p out
@@ -32,35 +35,75 @@ jobs:
             --target export-stage \
             --output type=local,dest=out \
             .
-          echo "=== APKs built ==="
+          echo "=== APK sau build ==="
           ls -lh out
 
+      # 6. Giải mã keystore
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
 
+      # 7. KÝ 2 BẢN RELEASE + PRINT
       - name: Sign APKs
         run: |
-          for apk in out/*.apk; do
-            echo "Signing $apk"
+          echo "=== Bắt đầu ký ==="
+          for apk in out/*release*.apk; do
+            orig=$(basename "$apk")
+            clean=$(echo "$orig" | sed 's/-unsigned//' | sed 's/\.apk$//')
+            outname="${clean}-signed.apk"
+            
+            echo "-> Ký: $orig"
+            echo "   => $outname"
+            
             $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
               --ks keystore.jks \
               --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
               --ks-key-alias ${{ secrets.KEY_ALIAS }} \
               --key-pass pass:${{ secrets.KEY_PASSWORD }} \
-              --out "${apk%.apk}-signed.apk" "$apk"
+              --out "out/$outname" "$apk"
           done
+          
+          rm -f out/*release*.apk
+          echo "=== Sau khi ký ==="
           ls -lh out
 
-      - name: Verify signatures
+      # 8. VERIFY + IN CHI TIẾT CHỮ KÝ
+      - name: Verify signatures (print certs)
         run: |
+          echo "=== Kiểm tra chữ ký ==="
           for apk in out/*-signed.apk; do
-            echo "=== $apk ==="
-            $ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs "$apk"
+            echo "------------------------------"
+            echo "File: $(basename $apk)"
+            $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose --print-certs "$apk" | tee verify.log
+            
+            # Lấy SHA-256 để xác nhận
+            SHA256=$(grep "SHA-256 digest" verify.log | head -1 | awk '{print $NF}')
+            echo "SHA-256: $SHA256"
           done
 
-      - name: Upload signed APKs
-        uses: actions/upload-artifact@v6
+      # 9. XÁC NHẬN APK RELEASE THẬT/GIẢ (so với fingerprint bạn lưu)
+      - name: Confirm release authenticity
+        env:
+          EXPECTED_SHA256: ${{ secrets.EXPECTED_CERT_SHA256 }} # bạn thêm secret này = SHA-256 của keystore
+        run: |
+          echo "=== Xác nhận fingerprint ==="
+          for apk in out/*-signed.apk; do
+            ACTUAL=$(apksigner verify --print-certs "$apk" 2>/dev/null | grep "SHA-256" | head -1 | awk '{print $NF}')
+            echo "File: $(basename $apk)"
+            echo "  Actual  : $ACTUAL"
+            echo "  Expected: $EXPECTED_SHA256"
+            if [ "$ACTUAL" = "$EXPECTED_SHA256" ]; then
+              echo "  ✅ THẬT - đúng keystore"
+            else
+              echo "  ❌ GIẢ - sai chữ ký!"
+              exit 1
+            fi
+          done
+
+      # 10. Upload tất cả
+      - name: Upload all APKs
+        uses: actions/upload-artifact@v4
         with:
-          name: bitcoin-wallet-10.26-release
-          path: out/*-signed.apk
-          retention-days: 90
+          name: bitcoin-wallet-10.26-all
+          path: |
+            out/*-signed.apk
+            out/*debug*.apk
