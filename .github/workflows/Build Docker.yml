@@ -1,211 +1,210 @@
-name: Build Bitcoin Wallet - Docker -  Full Verify
-# Workflow này build Bitcoin Wallet 10.26 từ source, ký 2 bản release, giữ 2 bản debug,
-# và in ra đầy đủ thông tin xác minh để chứng minh APK là thật.
+name: Build Bitcoin Wallet - Full Verify
+# Mục đích: build Bitcoin Wallet từ source bằng Docker Debian bullseye,
+# ký release, giữ debug, và in đầy đủ thông tin xác minh.
 
 on:
-  workflow_dispatch:  # chạy thủ công từ tab Actions
+  workflow_dispatch:  # cho phép bấm chạy thủ công
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # máy ảo Ubuntu mới nhất của GitHub
+    runs-on: ubuntu-latest
     steps:
-      # ----------------------------------------------------------------------
-      # 0. IN THÔNG TIN MÁY BUILD - để đối chiếu sau này
-      # ----------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # 0. In thông tin máy chạy để đối chiếu
+      # ------------------------------------------------------------------
       - name: 0. Print runner info
         run: |
           echo "=== THÔNG TIN MÁY BUILD ==="
-          uname -a              # hệ điều hành
-          date -u               # thời gian UTC
-          echo "GitHub commit: $GITHUB_SHA"
+          uname -a          # kernel, arch
+          date -u           # giờ UTC
+          echo "Commit SHA: $GITHUB_SHA"
 
-      # ----------------------------------------------------------------------
-      # 1. LẤY CODE TỪ REPO
-      # ----------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # 1. Lấy code
+      # ------------------------------------------------------------------
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # lấy toàn bộ lịch sử git để có thể verify commit
+          fetch-depth: 0    # lấy full history để git log chính xác
 
       - name: 1. Verify source commit
         run: |
-          echo "=== XÁC MINH SOURCE CODE ==="
-          git log -1 --pretty=full  # in chi tiết commit cuối
-          git rev-parse HEAD > commit.txt  # lưu hash commit để đưa vào báo cáo
+          echo "=== XÁC MINH SOURCE ==="
+          git log -1 --pretty=full   # in author, date, message
+          git rev-parse HEAD > commit.txt  # lưu hash để đưa vào báo cáo
 
-      # ----------------------------------------------------------------------
-      # 2. CÀI JDK 17 - chỉ dùng để chạy apksigner (công cụ ký), KHÔNG dùng để build
-      # ----------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # 2-4. Cài môi trường
+      # ------------------------------------------------------------------
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '17'   # JDK17 chỉ để chạy apksigner, không dùng build
 
-      # ----------------------------------------------------------------------
-      # 3. CÀI ANDROID SDK - để có apksigner, aapt
-      # ----------------------------------------------------------------------
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v3  # cài Android SDK
 
-      # ----------------------------------------------------------------------
-      # 4. CÀI DOCKER BUILDX - để build Containerfile
-      # ----------------------------------------------------------------------
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3     # cài Docker Buildx
 
-      # ----------------------------------------------------------------------
-      # 5. BUILD 4 APK BẰNG DOCKER (Debian bullseye + JDK11 + Gradle 4.4)
-      #    Containerfile sẽ build: devDebug, devRelease, prodDebug, prodRelease
-      # ----------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # 5. Build 4 APK trong Docker (giữ nguyên chuẩn gốc)
+      # ------------------------------------------------------------------
       - name: 2. Build 4 APKs with Docker
         run: |
-          set -e  # dừng ngay nếu có lỗi
+          set -e   # dừng ngay nếu lỗi
           mkdir -p out
-          # Build image và xuất file ra thư mục out/
           DOCKER_BUILDKIT=1 docker build \
             -f build.Containerfile \
             --target export-stage \
             --output type=local,dest=out \
             .
-          echo "=== FILE APK THÔ SAU BUILD ==="
-          ls -lh out/  # liệt kê kích thước
-          sha256sum out/*.apk | tee out/raw-sha256.txt  # tạo hash để kiểm tra toàn vẹn
+          echo "=== APK THÔ ==="
+          ls -lh out/
+          sha256sum out/*.apk | tee out/raw-sha256.txt  # hash để kiểm tra toàn vẹn
 
-      # ----------------------------------------------------------------------
-      # 6. GIẢI MÃ KEYSTORE TỪ SECRET - keystore bạn đã upload base64
-      # ----------------------------------------------------------------------
-      - name: 3. Decode keystore & in thông tin
+      # ------------------------------------------------------------------
+      # 6. Giải mã keystore từ secret
+      # ------------------------------------------------------------------
+      - name: 3. Decode keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
-          echo "=== THÔNG TIN KEYSTORE ==="
-          # In owner, ngày hết hạn, SHA1/SHA256 của chứng chỉ
+          echo "=== KEYSTORE INFO ==="
           keytool -list -v -keystore keystore.jks \
             -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
             -alias "${{ secrets.KEY_ALIAS }}" | tee keystore-info.txt
 
-      # ----------------------------------------------------------------------
-      # 7. TÌM ĐƯỜNG DẪN APKSIGNER - tránh lỗi version build-tools khác nhau
-      # ----------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # 7. Tìm apksigner ĐÚNG CHUẨN (không hardcode version)
+      # ------------------------------------------------------------------
       - name: 4. Find apksigner
-        id: signer
         run: |
-          APK=$(find $ANDROID_HOME -name apksigner -type f | head -1)
+          # Tìm tất cả file tên 'apksigner' trong build-tools, sắp xếp theo version, lấy mới nhất
+          APK=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+          # Kiểm tra có tìm được không
+          if [ -z "$APK" ]; then
+            echo "❌ LỖI: Không tìm thấy apksigner trong SDK"
+            exit 1
+          fi
+          # Lưu vào biến môi trường để các bước sau dùng
           echo "APKSIGNER=$APK" >> $GITHUB_ENV
           echo "Dùng apksigner tại: $APK"
-          $APK --version
+          "$APK" --version   # in version để log
 
-      # ----------------------------------------------------------------------
-      # 8. KÝ CHỈ 2 FILE RELEASE (dev và prod) - debug giữ nguyên không ký
-      # ----------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # 8. Ký 2 file release
+      # ------------------------------------------------------------------
       - name: 5. Sign release APKs
         run: |
           set -e
-          shopt -s nullglob  # nếu không có file thì mảng rỗng, không lỗi
-          files=(out/*release*.apk)  # tìm tất cả file chứa chữ "release"
-          
-          # Kiểm tra có file không
+          shopt -s nullglob   # nếu không có file, mảng rỗng thay vì giữ pattern
+          files=(out/*release*.apk)  # lấy tất cả file chứa 'release'
           if [ ${#files[@]} -eq 0 ]; then
-            echo "❌ LỖI: Không tìm thấy file release trong out/"
+            echo "❌ Không tìm thấy file release"
             ls -lh out/
             exit 1
           fi
-          
           for apk in "${files[@]}"; do
             orig=$(basename "$apk")
-            # Xóa chữ "-unsigned" nếu có, rồi thêm "-signed"
+            # bỏ '-unsigned' nếu có, bỏ '.apk', rồi thêm '-signed.apk'
             clean=$(echo "$orig" | sed 's/-unsigned//' | sed 's/\.apk$//')
             outname="${clean}-signed.apk"
-            
-            echo ">> Đang ký: $orig -> $outname"
+            echo ">> Ký $orig -> $outname"
             "$APKSIGNER" sign \
               --ks keystore.jks \
               --ks-pass pass:"${{ secrets.KEYSTORE_PASSWORD }}" \
               --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
               --key-pass pass:"${{ secrets.KEY_PASSWORD }}" \
               --out "out/$outname" "$apk"
-            echo "✓ Xong"
           done
-          
-          # Xóa file release chưa ký để tránh nhầm lẫn
+          # Xóa file chưa ký để tránh nhầm
           rm -f out/*release.apk out/*release-unsigned.apk 2>/dev/null || true
-          echo "=== SAU KHI KÝ ==="
           ls -lh out/
 
-      # ----------------------------------------------------------------------
-      # 9. VERIFY VÀ IN CHI TIẾT CHỮ KÝ - in SHA1/SHA256, scheme v1/v2/v3
-      # ----------------------------------------------------------------------
-      - name: 6. Verify signatures (in chi tiết)
+      # ------------------------------------------------------------------
+      # 9. Verify và in chứng chỉ
+      # ------------------------------------------------------------------
+      - name: 6. Verify signatures
         run: |
           shopt -s nullglob
           for apk in out/*-signed.apk; do
-            echo "========================================"
-            echo "KIỂM TRA: $(basename $apk)"
+            echo "===== $(basename $apk) ====="
             "$APKSIGNER" verify --verbose --print-certs "$apk"
           done
 
-      # ----------------------------------------------------------------------
-      # 10. DUMP THÔNG TIN APK - xác minh package name, versionCode
-      # ----------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # 10. Dump thông tin APK - FIX CHUẨN tìm aapt/aapt2
+      # ------------------------------------------------------------------
       - name: 7. Dump APK info (aapt)
         run: |
           echo "=== THÔNG TIN APK ==="
+          # Lấy thư mục build-tools nơi apksigner đang nằm
+          BUILD_TOOLS_DIR=$(dirname "$APKSIGNER")
+          # Ưu tiên aapt (bản cũ in badging đẹp), nếu không có thì dùng aapt2
+          AAPT="$BUILD_TOOLS_DIR/aapt"
+          if [ ! -x "$AAPT" ]; then
+            echo "aapt không có, thử aapt2..."
+            AAPT="$BUILD_TOOLS_DIR/aapt2"
+          fi
+          # Nếu vẫn không có (trường hợp SDK lạ), tìm toàn bộ SDK
+          if [ ! -x "$AAPT" ]; then
+            echo "Tìm aapt trong toàn bộ SDK..."
+            AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)
+          fi
+          # Kiểm tra cuối cùng
+          if [ -z "$AAPT" ] || [ ! -x "$AAPT" ]; then
+            echo "❌ LỖI NGHIÊM TRỌNG: Không tìm thấy aapt hoặc aapt2"
+            exit 1
+          fi
+          echo "Sử dụng AAPT: $AAPT"
+          # Lặp qua từng APK và đọc AndroidManifest
           for apk in out/*.apk; do
             echo "--- $(basename $apk) ---"
-            # aapt đọc AndroidManifest
-            aapt dump badging "$apk" | grep -E "package:|versionName|versionCode|sdkVersion"
+            # 'dump badging' in ra package name, versionName, versionCode, sdkVersion
+            "$AAPT" dump badging "$apk" | grep -E "package:|versionName|versionCode|sdkVersion"
           done
 
-      # ----------------------------------------------------------------------
-      # 11. XÁC THỰC THẬT/GIẢ - so sánh fingerprint với secret
-      # ----------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # 11. So sánh fingerprint để xác thực thật/giả
+      # ------------------------------------------------------------------
       - name: 8. Authenticity check
         env:
-          EXPECTED_SHA256: ${{ secrets.EXPECTED_CERT_SHA256 }}  # bạn tự thêm secret này sau lần build đầu
+          EXPECTED_SHA256: ${{ secrets.EXPECTED_CERT_SHA256 }}
         run: |
-          echo "=== SO SÁNH FINGERPRINT ==="
-          echo "Fingerprint mong đợi: $EXPECTED_SHA256"
+          echo "=== KIỂM TRA FINGERPRINT ==="
           shopt -s nullglob
           for apk in out/*-signed.apk; do
             ACTUAL=$("$APKSIGNER" verify --print-certs "$apk" | grep "SHA-256" | awk '{print $NF}')
             echo "$(basename $apk): $ACTUAL"
             if [ -n "$EXPECTED_SHA256" ]; then
               if [ "$ACTUAL" = "$EXPECTED_SHA256" ]; then
-                echo "✅ KẾT LUẬN: THẬT - đúng keystore của bạn"
+                echo "✅ THẬT - khớp keystore"
               else
-                echo "❌ KẾT LUẬN: GIẢ - sai chữ ký!"
-                exit 1  # fail workflow
+                echo "❌ GIẢ - không khớp!"
+                exit 1
               fi
-            else
-              echo "⚠️ Chưa đặt EXPECTED_CERT_SHA256, bỏ qua so sánh"
             fi
           done
 
-      # ----------------------------------------------------------------------
-      # 12. TẠO BÁO CÁO CUỐI CÙNG
-      # ----------------------------------------------------------------------
-      - name: 9. Generate final report
+      # ------------------------------------------------------------------
+      # 12. Tạo báo cáo
+      # ------------------------------------------------------------------
+      - name: 9. Generate report
         run: |
           {
             echo "===== BITCOIN WALLET BUILD REPORT ====="
-            echo "Thời gian: $(date -u)"
+            echo "Thời gian UTC: $(date -u)"
             echo "Commit: $(cat commit.txt)"
             echo ""
-            echo "--- SHA256 của tất cả APK ---"
+            echo "--- SHA256 ---"
             sha256sum out/*.apk
-            echo ""
-            echo "--- Chứng chỉ ---"
-            for apk in out/*-signed.apk; do
-              echo "$(basename $apk)"
-              "$APKSIGNER" verify --print-certs "$apk" | grep digest
-            done
           } | tee report.txt
 
-      # ----------------------------------------------------------------------
-      # 13. UPLOAD ARTIFACT - tải về được 4 APK + báo cáo
-      # ----------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # 13. Upload
+      # ------------------------------------------------------------------
       - name: 10. Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: bitcoin-wallet-verified
           path: |
             out/*.apk
-            out/*.txt
             report.txt
             keystore-info.txt
