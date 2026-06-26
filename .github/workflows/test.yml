@@ -1,26 +1,52 @@
-name: Build Bitcoin Wallet v10.26
+# =================================================================
+# FILE: .github/workflows/Build APK Full.yml
+# MỤC ĐÍCH:
+#   - Build 4 biến thể APK bằng build.Containerfile (thay cho gradle trực tiếp)
+#   - Ký devRelease & prodRelease bằng keystore riêng (giữ nguyên logic cũ)
+# =================================================================
+
+name: Build Bitcoin Wallet - All Real Variants - Container
 
 on:
-  workflow_dispatch:   # chạy tay từ tab Actions
-  push:
-    paths:
-      - 'build.Containerfile'
-      - '.github/workflows/build.yml'
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      # ----- BƯỚC 1: Lấy mã nguồn -----
+      - name: Checkout source code
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
 
-      - name: Cài buildah + fuse
+      # ----- BƯỚC 2: Android SDK 34 (cần cho apksigner/aapt) -----
+      - name: Setup Android SDK 34
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+
+      # ----- BƯỚC 3: Fix build.Containerfile cho 2026 -----
+      - name: Patch Containerfile (archive + build 4 variants)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y buildah fuse-overlayfs
+          # 1) bullseye đã EOL -> dùng archive
+          sed -i 's|FROM debian:bullseye-backports|FROM debian:bullseye-slim|' build.Containerfile
+          sed -i '/ENV DEBIAN_FRONTEND/a RUN echo '\''deb http://archive.debian.org/debian bullseye main'\'' > /etc/apt/sources.list && echo '\''deb http://archive.debian.org/debian bullseye-backports main'\'' >> /etc/apt/sources.list && echo '\''Acquire::Check-Valid-Until "false";'\'' > /etc/apt/apt.conf.d/99no-check' build.Containerfile
+          
+          # 2) build cả 4 biến thể thay vì chỉ assembleRelease
+          sed -i 's|:wallet:assembleRelease|:wallet:assembleDevDebug :wallet:assembleDevRelease :wallet:assembleProdDebug :wallet:assembleProdRelease|' build.Containerfile
+          
+          # 3) copy tất cả APK ra ngoài (không chỉ release)
+          sed -i 's|COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk/\*/release/bitcoin-wallet-\*-release-unsigned.apk /|COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk/*/*/*.apk /|' build.Containerfile
 
-      - name: Build APK (reproducible)
+      # ----- BƯỚC 4: Cài buildah -----
+      - name: Install buildah
+        run: sudo apt-get update && sudo apt-get install -y buildah fuse-overlayfs
+
+      # ----- BƯỚC 5: Build bằng container -----
+      - name: Build all APK variants via Containerfile
         run: |
           mkdir -p out
           sudo buildah build \
@@ -29,13 +55,91 @@ jobs:
             --file build.Containerfile \
             --output out \
             .
+          ls -lh out
 
-      - name: Liệt kê kết quả
-        run: ls -lh out
+      # ----- BƯỚC 6: Đưa APK về đúng cấu trúc cũ để bước ký không đổi -----
+      - name: Restore APK folder structure
+        run: |
+          mkdir -p wallet/build/outputs/apk/dev/debug
+          mkdir -p wallet/build/outputs/apk/dev/release
+          mkdir -p wallet/build/outputs/apk/prod/debug
+          mkdir -p wallet/build/outputs/apk/prod/release
+          cp out/*dev*debug*.apk  wallet/build/outputs/apk/dev/debug/bitcoin-wallet-dev-debug.apk
+          cp out/*dev*release*.apk wallet/build/outputs/apk/dev/release/bitcoin-wallet-dev-release-unsigned.apk
+          cp out/*prod*debug*.apk wallet/build/outputs/apk/prod/debug/bitcoin-wallet-prod-debug.apk
+          cp out/*prod*release*.apk wallet/build/outputs/apk/prod/release/bitcoin-wallet-prod-release-unsigned.apk
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      # ----- BƯỚC 7: Giải mã keystore (giữ nguyên) -----
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+
+      # ----- BƯỚC 8: Ký devRelease (giữ nguyên) -----
+      - name: Sign devRelease APK
+        run: |
+          APK_PATH=$(find wallet/build/outputs/apk/dev/release -name "*.apk" | head -1)
+          $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
+            --ks keystore.jks \
+            --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
+            --ks-key-alias ${{ secrets.KEY_ALIAS }} \
+            --key-pass pass:${{ secrets.KEY_PASSWORD }} \
+            "$APK_PATH"
+
+      # ----- BƯỚC 9: Ký prodRelease (giữ nguyên) -----
+      - name: Sign prodRelease APK
+        run: |
+          APK_PATH=$(find wallet/build/outputs/apk/prod/release -name "*.apk" | head -1)
+          $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
+            --ks keystore.jks \
+            --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
+            --ks-key-alias ${{ secrets.KEY_ALIAS }} \
+            --key-pass pass:${{ secrets.KEY_PASSWORD }} \
+            "$APK_PATH"
+
+      # ----- BƯỚC 10: Xác minh chữ ký (giữ nguyên) -----
+      - name: Verify signatures of release APKs
+        run: |
+          for variant in dev/release prod/release; do
+            APK_PATH=$(find wallet/build/outputs/apk/${variant} -name "*.apk" | head -1)
+            echo "Verifying $APK_PATH"
+            $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose --print-certs "$APK_PATH"
+          done
+
+      # ----- BƯỚC 11: Đảm bảo release không debuggable (giữ nguyên) -----
+      - name: Ensure release APKs are not debuggable
+        run: |
+          APK_PROD_REL=$(find wallet/build/outputs/apk/prod/release -name "*.apk" | head -1)
+          if aapt dump badging "$APK_PROD_REL" | grep -q 'debuggable="true"'; then
+            echo "❌ ERROR: prodRelease.apk vẫn còn debuggable!"
+            exit 1
+          else
+            echo "✅ prodRelease.apk là bản release thật."
+          fi
+          
+          APK_DEV_REL=$(find wallet/build/outputs/apk/dev/release -name "*.apk" | head -1)
+          if aapt dump badging "$APK_DEV_REL" | grep -q 'debuggable="true"'; then
+            echo "❌ ERROR: devRelease.apk vẫn còn debuggable!"
+            exit 1
+          else
+            echo "✅ devRelease.apk là bản release thật."
+          fi
+
+      # ----- BƯỚC 12: Đổi tên APK (giữ nguyên) -----
+      - name: Rename APKs
+        run: |
+          mkdir -p wallet/build/outputs/apk/final
+          cp wallet/build/outputs/apk/dev/debug/*.apk      wallet/build/outputs/apk/final/bitcoin-wallet-dev-debug.apk
+          cp wallet/build/outputs/apk/dev/release/*.apk   wallet/build/outputs/apk/final/bitcoin-wallet-dev-release-signed.apk
+          cp wallet/build/outputs/apk/prod/debug/*.apk     wallet/build/outputs/apk/final/bitcoin-wallet-prod-debug.apk
+          cp wallet/build/outputs/apk/prod/release/*.apk  wallet/build/outputs/apk/final/bitcoin-wallet-prod-release-signed.apk
+          rm -rf wallet/build/outputs/apk/dev wallet/build/outputs/apk/prod
+          mv wallet/build/outputs/apk/final/* wallet/build/outputs/apk/
+          rmdir wallet/build/outputs/apk/final
+
+      # ----- BƯỚC 13: Upload 4 APK (giữ nguyên) -----
+      - name: Upload all APKs
+        uses: actions/upload-artifact@v6
         with:
-          name: bitcoin-wallet-v10.26-unsigned
-          path: out/*.apk
-          retention-days: 7
+          name: bitcoin-wallet-all-variants
+          path: wallet/build/outputs/apk/*.apk
+          retention-days: 90
