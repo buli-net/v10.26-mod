@@ -24,6 +24,7 @@ jobs:
 
       - name: 1b. Verify commit
         run: |
+          echo "=== SOURCE VERIFICATION ==="
           git log -1 --pretty=full
           git rev-parse HEAD > commit.txt
 
@@ -42,7 +43,7 @@ jobs:
       - name: 5. Build APKs with Docker
         run: |
           mkdir -p out
-          DOCKER_BUILDKIT=1 docker build -f build.Containerfile --target export-stage --output type=local,dest=out.
+          DOCKER_BUILDKIT=1 docker build -f build.Containerfile --target export-stage --output type=local,dest=out .
           ls -lh out/
           sha256sum out/*.apk | tee out/raw-sha256.txt
 
@@ -55,22 +56,39 @@ jobs:
         run: |
           APK=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
           echo "APKSIGNER=$APK" >> $GITHUB_ENV
+          echo "Using apksigner: $APK"
 
       - name: 8. Sign release APKs
         run: |
+          set -e
+          shopt -s nullglob
           for apk in out/*release*.apk; do
-            outname=$(basename "$apk".apk | sed 's/-unsigned//')-signed.apk
+            base=$(basename "$apk")
+            clean=$(echo "$base" | sed 's/-unsigned//' | sed 's/\.apk$//')
+            outname="${clean}-signed.apk"
+            echo "Signing $base -> $outname"
             "$APKSIGNER" sign --ks keystore.jks --ks-pass pass:"${{ secrets.KEYSTORE_PASSWORD }}" --ks-key-alias "${{ secrets.KEY_ALIAS }}" --key-pass pass:"${{ secrets.KEY_PASSWORD }}" --out "out/$outname" "$apk"
           done
-          rm -f out/*release-unsigned.apk out/*release.apk
+          rm -f out/*release-unsigned.apk out/*release.apk 2>/dev/null || true
+          ls -lh out/
 
       - name: 9. Verify signatures
         run: |
-          for apk in out/*-signed.apk; do "$APKSIGNER" verify --verbose --print-certs "$apk"; done
+          for apk in out/*-signed.apk; do
+            echo "===== VERIFYING $(basename $apk) ====="
+            "$APKSIGNER" verify --verbose --print-certs "$apk"
+          done
 
       - name: 10. Generate report
         run: |
-          { echo "Build: $(date -u)"; echo "Commit: $(cat commit.txt)"; sha256sum out/*.apk; } > report.txt
+          {
+            echo "===== BITCOIN WALLET BUILD REPORT ====="
+            echo "Build time (UTC): $(date -u)"
+            echo "Git commit: $(cat commit.txt)"
+            echo ""
+            echo "--- SHA256 CHECKSUMS ---"
+            sha256sum out/*.apk
+          } > report.txt
 
       - name: 11. Upload artifacts (Node24)
         uses: actions/upload-artifact@v6.0.0
