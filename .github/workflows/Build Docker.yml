@@ -1,4 +1,4 @@
-name: Build Bitcoin Wallet - Docker trixie
+name: Build Bitcoin Wallet - Docker bullseye
 
 on:
   workflow_dispatch:
@@ -7,10 +7,10 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v5
 
-      - name: Setup JDK 17 for signing
+      - name: Setup JDK 17 for apksigner
         uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -32,6 +32,7 @@ jobs:
             --target export-stage \
             --output type=local,dest=out \
             .
+          echo "=== APKs built ==="
           ls -lh out
 
       - name: Decode keystore
@@ -40,6 +41,7 @@ jobs:
       - name: Sign APKs
         run: |
           for apk in out/*.apk; do
+            echo "Signing $apk"
             $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
               --ks keystore.jks \
               --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
@@ -49,15 +51,16 @@ jobs:
           done
           ls -lh out
 
-      - name: Verify
+      - name: Verify signatures
         run: |
           for apk in out/*-signed.apk; do
+            echo "=== $apk ==="
             $ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs "$apk"
           done
 
-      - name: Upload
+      - name: Upload signed APKs
         uses: actions/upload-artifact@v6
         with:
-          name: bitcoin-wallet-release
+          name: bitcoin-wallet-10.26-release
           path: out/*-signed.apk
           retention-days: 90
