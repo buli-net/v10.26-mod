@@ -16,7 +16,7 @@
 # directory. Use `apksigner` to sign before installing via `adb install`.
 #
 
-FROM debian:bullseye-backports AS build-stage
+FROM debian:trixie-slim AS build-stage
 
 # install debian packages
 ENV DEBIAN_FRONTEND noninteractive
@@ -24,7 +24,7 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
     /bin/rm -f /etc/apt/apt.conf.d/docker-clean && \
     /usr/bin/apt-get update && \
-    /usr/bin/apt-get --yes --no-install-recommends install disorderfs openjdk-11-jdk-headless gradle sdkmanager && \
+    /usr/bin/apt-get --yes --no-install-recommends install disorderfs openjdk-21-jdk-headless gradle sdkmanager && \
     /bin/ln -fs /usr/share/zoneinfo/CET /etc/localtime && \
     /usr/sbin/dpkg-reconfigure --frontend noninteractive tzdata && \
     /bin/ln -s /proc/self/mounts /etc/mtab && \
@@ -49,11 +49,15 @@ RUN --mount=target=/home/builder/android-sdk,type=cache,uid=1000,gid=1000,sharin
       then /bin/mv project project.u && /bin/mkdir project && \
       /usr/bin/disorderfs --sort-dirents=yes --reverse-dirents=no project.u project ; \
     fi && \
-    /usr/bin/gradle --project-dir project/ --no-build-cache --no-daemon --no-parallel clean :wallet:assembleRelease && \
+    /usr/bin/gradle --project-dir project/ --no-build-cache --no-daemon --no-parallel \
+                    clean :wallet:assembleRelease \
+                    --exclude-task :wallet:compileTestnetReleaseAidl --exclude-task :wallet:compileTestnetReleaseRenderscript \
+                    --exclude-task :wallet:compileSignetReleaseAidl --exclude-task :wallet:compileSignetReleaseRenderscript \
+                    --exclude-task :wallet:compileMainnetReleaseAidl --exclude-task :wallet:compileMainnetReleaseRenderscript && \
     if [ -e /dev/fuse ] ; \
-      then /bin/fusermount -u project | true && /bin/rmdir project && /bin/mv project.u project ; \
+      then /usr/bin/sleep 1 && /bin/fusermount -u project && /bin/rmdir project && /bin/mv project.u project ; \
     fi
 
 # export build output
 FROM scratch AS export-stage
-COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk/*/release/bitcoin-wallet-*-release-unsigned.apk /
+COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk/bitcoin-wallet-*-release.apk /
