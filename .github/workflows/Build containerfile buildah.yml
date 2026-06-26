@@ -7,29 +7,42 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout
+      # 0. Checkout source code
+      - name: 0. Checkout
         uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0
 
-      - name: Setup JDK 17
+      # 1. Print runner and commit info for traceability
+      - name: 1. Runner info
+        run: |
+          echo "=== RUNNER INFO ==="
+          uname -a
+          date -u
+          git log -1 --pretty=full
+
+      # 2. Install JDK 17 (only for apksigner, build uses JDK11 inside container)
+      - name: 2. Setup JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK 34
+      # 3. Install Android SDK with build-tools 34
+      - name: 3. Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
-      - name: Install buildah
+      # 4. Install buildah (rootless container builder)
+      - name: 4. Install buildah
         run: |
           sudo apt-get update
           sudo apt-get install -y buildah fuse-overlayfs
 
-      - name: Build with build.Containerfile.buildah
+      # 5. Build APKs using buildah and export-stage
+      - name: 5. Build with buildah
         run: |
           mkdir -p out
           sudo buildah bud \
@@ -44,9 +57,13 @@ jobs:
           sudo cp -r $mnt/apk out/
           sudo buildah umount $ctr
           sudo buildah rm $ctr
-          find out -type f -name "*.apk"
+          
+          echo "=== APKs from container ==="
+          find out -type f -name "*.apk" -exec ls -lh {} \;
+          sha256sum out/apk/*/*/*.apk | tee out/raw-sha256.txt
 
-      - name: Prepare folders
+      # 6. Organize APKs into standard Gradle output paths
+      - name: 6. Prepare folders
         run: |
           mkdir -p wallet/build/outputs/apk/dev/debug
           mkdir -p wallet/build/outputs/apk/dev/release
@@ -57,36 +74,103 @@ jobs:
           cp out/apk/prod/debug/*.apk wallet/build/outputs/apk/prod/debug/bitcoin-wallet-prod-debug.apk
           cp out/apk/prod/release/*.apk wallet/build/outputs/apk/prod/release/bitcoin-wallet-prod-release-unsigned.apk
 
-      - name: Decode Keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+      # 7. Decode keystore from GitHub secret
+      - name: 7. Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+          echo "=== KEYSTORE INFO ==="
+          keytool -list -v -keystore keystore.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -alias "${{ secrets.KEY_ALIAS }}" | tee keystore-info.txt
 
-      - name: Sign devRelease
+      # 8. Locate apksigner and aapt dynamically (no hardcoded version)
+      - name: 8. Find build tools
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+          AAPT=$(dirname "$APKSIGNER")/aapt
+          if [ ! -x "$AAPT" ]; then AAPT=$(dirname "$APKSIGNER")/aapt2; fi
+          echo "APKSIGNER=$APKSIGNER" >> $GITHUB_ENV
+          echo "AAPT=$AAPT" >> $GITHUB_ENV
+          echo "Using apksigner: $APKSIGNER"
+          echo "Using aapt: $AAPT"
+
+      # 9. Sign dev release APK
+      - name: 9. Sign devRelease
         run: |
           APK=wallet/build/outputs/apk/dev/release/bitcoin-wallet-dev-release-unsigned.apk
-          $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks keystore.jks --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} --ks-key-alias ${{ secrets.KEY_ALIAS }} --key-pass pass:${{ secrets.KEY_PASSWORD }} "$APK"
+          "$APKSIGNER" sign --ks keystore.jks --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} --ks-key-alias ${{ secrets.KEY_ALIAS }} --key-pass pass:${{ secrets.KEY_PASSWORD }} --out wallet/build/outputs/apk/dev/release/bitcoin-wallet-dev-release-signed.apk "$APK"
 
-      - name: Sign prodRelease
+      # 10. Sign prod release APK
+      - name: 10. Sign prodRelease
         run: |
           APK=wallet/build/outputs/apk/prod/release/bitcoin-wallet-prod-release-unsigned.apk
-          $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks keystore.jks --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} --ks-key-alias ${{ secrets.KEY_ALIAS }} --key-pass pass:${{ secrets.KEY_PASSWORD }} "$APK"
+          "$APKSIGNER" sign --ks keystore.jks --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} --ks-key-alias ${{ secrets.KEY_ALIAS }} --key-pass pass:${{ secrets.KEY_PASSWORD }} --out wallet/build/outputs/apk/prod/release/bitcoin-wallet-prod-release-signed.apk "$APK"
 
-      - name: Verify
+      # 11. Verify signatures and print certificates
+      - name: 11. Verify signatures
         run: |
-          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs wallet/build/outputs/apk/dev/release/*.apk
-          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs wallet/build/outputs/apk/prod/release/*.apk
+          echo "===== DEV RELEASE ====="
+          "$APKSIGNER" verify --verbose --print-certs wallet/build/outputs/apk/dev/release/*-signed.apk
+          echo "===== PROD RELEASE ====="
+          "$APKSIGNER" verify --verbose --print-certs wallet/build/outputs/apk/prod/release/*-signed.apk
 
-      - name: Final APKs
+      # 12. Dump APK metadata (package, version, SDK)
+      - name: 12. Dump APK info
+        run: |
+          echo "=== APK METADATA ==="
+          for apk in wallet/build/outputs/apk/*/*/*.apk; do
+            echo "--- $(basename $apk) ---"
+            "$AAPT" dump badging "$apk" | grep -E "package:|versionName|versionCode|sdkVersion"
+          done
+
+      # 13. Authenticity check against expected certificate fingerprint
+      - name: 13. Authenticity check
+        env:
+          EXPECTED_SHA256: ${{ secrets.EXPECTED_CERT_SHA256 }}
+        run: |
+          echo "=== FINGERPRINT CHECK ==="
+          for apk in wallet/build/outputs/apk/*/*/*-signed.apk; do
+            ACTUAL=$("$APKSIGNER" verify --print-certs "$apk" | grep SHA-256 | awk '{print $NF}')
+            echo "$(basename $apk): $ACTUAL"
+            if [ -n "$EXPECTED_SHA256" ]; then
+              if [ "$ACTUAL" = "$EXPECTED_SHA256" ]; then
+                echo "✅ AUTHENTIC"
+              else
+                echo "❌ MISMATCH - expected $EXPECTED_SHA256"
+                exit 1
+              fi
+            fi
+          done
+
+      # 14. Collect final APKs and generate detailed report
+      - name: 14. Finalize
         run: |
           mkdir -p final
           cp wallet/build/outputs/apk/dev/debug/*.apk final/bitcoin-wallet-dev-debug.apk
-          cp wallet/build/outputs/apk/dev/release/*.apk final/bitcoin-wallet-dev-release-signed.apk
+          cp wallet/build/outputs/apk/dev/release/*-signed.apk final/bitcoin-wallet-dev-release-signed.apk
           cp wallet/build/outputs/apk/prod/debug/*.apk final/bitcoin-wallet-prod-debug.apk
-          cp wallet/build/outputs/apk/prod/release/*.apk final/bitcoin-wallet-prod-release-signed.apk
+          cp wallet/build/outputs/apk/prod/release/*-signed.apk final/bitcoin-wallet-prod-release-signed.apk
+          
+          {
+            echo "===== BITCOIN WALLET BUILD REPORT (BUILDAH) ====="
+            echo "Build time (UTC): $(date -u)"
+            echo "Git commit: $(git rev-parse HEAD)"
+            echo ""
+            echo "--- Keystore SHA-256 ---"
+            keytool -list -v -keystore keystore.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -alias "${{ secrets.KEY_ALIAS }}" | grep SHA256
+            echo ""
+            echo "--- Final APK SHA256 ---"
+            sha256sum final/*.apk
+          } > final/report.txt
+          
           ls -lh final
 
-      - name: Upload
-        uses: actions/upload-artifact@v6
+      # 15. Upload artifacts (fixed: v6 does not exist, use v4)
+      - name: 15. Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: bitcoin-wallet-all-variants
-          path: final/*.apk
+          path: |
+            final/*.apk
+            final/report.txt
+            keystore-info.txt
+            out/raw-sha256.txt
           retention-days: 90
