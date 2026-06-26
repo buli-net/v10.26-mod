@@ -1,9 +1,8 @@
 FROM debian:bullseye-slim AS build-stage
 ENV DEBIAN_FRONTEND=noninteractive
 
-# bullseye EOL -> chỉ dùng archive main
 RUN echo 'deb http://archive.debian.org/debian bullseye main' > /etc/apt/sources.list && \
-    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check
+    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt.conf.d/99no-check
 
 RUN apt-get update && \
     apt-get -y install --no-install-recommends disorderfs openjdk-11-jdk-headless gradle wget unzip && \
@@ -14,18 +13,15 @@ RUN apt-get update && \
 
 USER builder
 WORKDIR /home/builder
-
-# cài Android SDK commandline-tools
 ENV ANDROID_HOME=/home/builder/android-sdk
 RUN mkdir -p $ANDROID_HOME/cmdline-tools && \
-    wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/tools.zip && \
+    wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O /tmp/tools.zip && \
     unzip -q /tmp/tools.zip -d $ANDROID_HOME/cmdline-tools && \
     mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest && \
     rm /tmp/tools.zip && \
     yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null
 
 ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-
 WORKDIR /home/builder
 COPY --chown=builder / project/
 
