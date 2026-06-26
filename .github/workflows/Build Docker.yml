@@ -1,4 +1,4 @@
-name: Build Bitcoin Wallet - Full Verify
+name: Build Bitcoin Wallet - Docker -  Full Verify
 # Workflow này build Bitcoin Wallet 10.26 từ source, ký 2 bản release, giữ 2 bản debug,
 # và in ra đầy đủ thông tin xác minh để chứng minh APK là thật.
 
