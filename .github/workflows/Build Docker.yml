@@ -23,7 +23,7 @@ jobs:
       # ------------------------------------------------------------------
       # 1. Checkout source - uses v5 (Node 24 support)
       # ------------------------------------------------------------------
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5.0.0
         with:
           fetch-depth: 0  # get full history to verify commit
 
@@ -37,7 +37,7 @@ jobs:
       # 2. Install JDK 17 - uses setup-java@v5 (Node 24)
       #    JDK17 is only for apksigner, NOT for building (build uses JDK11 in Docker)
       # ------------------------------------------------------------------
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v5.0.0
         with:
           distribution: temurin
           java-version: '17'
@@ -45,12 +45,12 @@ jobs:
       # ------------------------------------------------------------------
       # 3. Install Android SDK - uses setup-android@v4 (Node 24 fix)
       # ------------------------------------------------------------------
-      - uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@v4.0.0
 
       # ------------------------------------------------------------------
-      # 4. Install Docker Buildx - v3.11+ supports Node 24
+      # 4. Install Docker Buildx - v3.11.1+ supports Node 24
       # ------------------------------------------------------------------
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3.11.1
 
       # ------------------------------------------------------------------
       # 5. Build 4 APKs inside Docker (keeps original build standard)
@@ -206,10 +206,10 @@ jobs:
           } | tee report.txt
 
       # ------------------------------------------------------------------
-      # 13. Upload artifacts - uses upload-artifact@v4 (Node 24 compatible)
+      # 13. Upload artifacts - uses upload-artifact@v4.6.2 (Node 24 compatible)
       # ------------------------------------------------------------------
       - name: 10. Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: bitcoin-wallet-verified
           path: |
