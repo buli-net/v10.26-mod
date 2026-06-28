@@ -35,7 +35,7 @@ v10.26 mod by buli
 - Add code file wallet/src/de/schildbach/wallet/ui/WalletTransactionsFragment.java [ add code line 261->1091,1126->1128, 1158->1162]
 
 + Add bar sync block start app
-- wallet/src/net/buli/w/ui/WalletActivity.java 
+- wallet/src/de/schildbach/wallet/ui/WalletActivity.java 
 [ Add code line 76->84, add line 151->307 ]
 
 + add on/off check for new version in settings menu.
