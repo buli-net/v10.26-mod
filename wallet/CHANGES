@@ -31,7 +31,7 @@ v10.26 mod by buli
 + Add button [i] show transaction
 - Create file wallet/res/drawable/ic_info_white_24dp.xml [ icon (i) ]
 - Create file wallet/res/drawable/ic_copy.xml [ icon coppy ]
-- Add code file wallet/res/menu/wallet_transactions_context.xml [ add code line 11->15 ]
+- Add code file wallet/res/menu/wallet_transactions_context.xml [ add code line 11->16 ]
 - Add code file wallet/src/de/schildbach/wallet/ui/WalletTransactionsFragment.java [ add code line 261->1091,1126->1128, 1158->1162]
 
 + Add bar sync block start app
